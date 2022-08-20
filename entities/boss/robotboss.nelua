@@ -1,0 +1,242 @@
+require "entities.boss.pathfinder"
+require "entities.boss.robotboss_attacks"
+require "entities.boss.entity_handler"
+
+global RobotBoss = @record{
+  animation: Animation,
+  action: RobotAction,
+  entity_handler: EntityHandler,
+  damage_info: vector(DamageInfo),
+  speed: float32,
+  timer: float32,
+  state: RobotState,
+
+  -- Health
+  hp: integer,
+  max_hp: integer,
+
+  -- Pathfinder
+  pathfinder: Pathfinder,
+  attacks: RobotAttack
+}
+
+function RobotBoss:init(pos: Vector2, radius: float32, hp: integer, player: *Player)
+  self.animation:init("assets/graphics/boss.png", pos, radius)
+  self.animation:create(AnimationID.Idle, AnimationInfo{Rectangle{0, 0, 172, 125}, {1, 1, 1, 1}})
+  self.animation:create(AnimationID.Walking, AnimationInfo{Rectangle{0, 126, 172, 124}, {0.1, 0.2, 0.1, 0.2}})
+  self.animation:create(AnimationID.Attacking, AnimationInfo{Rectangle{0, 249, 169, 140}, {0.2, 0.2, 0.2, 0.2}})
+  self.animation.angle = math.pi
+
+  self.pathfinder:init()
+
+  self.action = RobotAction.Chase
+  self.state = RobotState.Normal
+  self.timer = 0
+  self.hp = hp
+  self.max_hp = hp
+  self.speed = 1.4
+  self.attacks:init()
+
+  self.entity_handler:add_entity(EntityInfo{
+    &player.animation.position, player.animation.hitbox_radius,
+    EntityId.Player, &player.health.hp, &player.damage_info
+  })
+end
+
+function RobotBoss:reset()
+  self.action = RobotAction.Chase
+  self.state = RobotState.Normal
+  self.timer = 0
+  self.animation.position = Vector2{930, 790}
+  self.animation.angle = math.pi
+  self.hp = self.max_hp
+  self.speed = 1.4
+  self.animation.color = WHITE
+
+  self.attacks.missile_shot = false
+  self.attacks.missile_reached_target = false
+  self.attacks.missile_timer = 3
+
+  self.attacks.laser_max_bullets = 6
+  self.attacks.laser_max_delay_bullets = 0.4
+  self.attacks.laser_angle_offset = math.pi/12
+
+  robot_damage = {800, 4000, 1500, 1200}
+end
+
+function RobotBoss:update(map: *Map, player: *Player, gameover: boolean)
+  self.animation:update()
+
+  if (gameover) then
+    self.animation:set_id(AnimationID.Idle)
+    self.pathfinder:clear_path()
+    return
+  end
+
+  self.timer = self.timer + GetFrameTime()
+
+  if (self.timer > 60 and self.state == RobotState.Normal) then
+    self.state = RobotState.Charge
+  elseif (self.timer > 95 and self.state == RobotState.Charge) then
+    self.state = RobotState.Angry
+    self.animation.color = PURPLE
+    robot_damage[Attack.Melee]  = 1000
+    robot_damage[Attack.Charge] = 1400
+    robot_damage[Attack.Laser]  = 1400
+    self.speed = self.speed + 0.1
+    self.attacks.laser_angle_offset = math.pi/16
+    self.attacks:set_laser_values(9, 0.3)
+  elseif (self.timer > 150 and self.state == RobotState.Angry) then
+    self.state = RobotState.Rocket
+    self.animation.color = RED
+    robot_damage[Attack.Melee]  = 1200
+    robot_damage[Attack.Charge] = 1700
+    robot_damage[Attack.Laser]  = 1700
+    self.attacks.laser_angle_offset = math.pi/32
+    self.speed = self.speed + 0.1
+    self.attacks:set_laser_values(18, 0.2)
+  end
+
+  if (player.super.deployed or player.super.is_aiming) then
+    local index = self.entity_handler:get_entity_index(EntityId.Turret)
+    if (player.super.deployed and index == -1 and player.super.turret_hp > 0) then
+      self.entity_handler:add_entity(
+        EntityInfo{
+          &player.super.position, 5.0, EntityId.Turret,
+          &player.super.turret_hp, &player.super.damage_info
+        }
+      )
+    elseif (player.super.turret_hp <= 0 or player.super.is_aiming) then
+      if (index ~= -1) then
+        self.entity_handler.entity_list:remove(index)
+        player.super.deployed = false
+        player.super.turret_hp = player.super.turret_max_hp
+      end
+    end
+  end
+
+  local nearest_entity = self.entity_handler:get_nearest_entity()
+  local entity_dist = Utils.get_distance(nearest_entity.position, self.animation.position)
+
+  local new_anim = self.attacks:update(
+    &self.action, &self.state, &self.pathfinder, &self.animation, map, player,
+    self.speed, &self.entity_handler.entity_list, &nearest_entity, entity_dist
+  )
+  self.animation:set_id(new_anim)
+
+  for i=0, <player.bullets.max_projectile do
+    local projectile_rect = Rectangle{player.bullets.projectile[i].position.x, player.bullets.projectile[i].position.y, 2, 2}
+    if (not player.bullets.projectile[i].on_screen) then
+      continue
+    end
+    if (CheckCollisionCircleRec(self.animation.position, self.animation.hitbox_radius, projectile_rect)) then
+      player.bullets.projectile[i].on_screen = false
+      player.bullets.lower_bullet = player.bullets.lower_bullet + 1
+      player.super.charge = math.clamp(player.super.charge+player.super.charge_per_hit, 0.0, 360.0)
+      -- Damage boss
+      self.hp = self.hp - player.bullets.damage_per_bullet
+      self.damage_info:push(DamageInfo{
+        player.bullets.damage_per_bullet,
+        &self.animation.position,
+        Vector2{math.random(-80, 80), math.random(-60, 0)},
+        WHITE,
+        1.0
+      })
+    end
+  end
+end
+
+function RobotBoss:draw()
+  self.animation:draw()
+  local pos = Vector2{self.animation.position.x-self.animation.hitbox_radius, self.animation.position.y-2.5*self.animation.hitbox_radius}
+  local size = Vector2{100.0, 10.0}
+  DrawRectangleV(pos+Vector2{-1,-1}, size+Vector2{2,2}, BLACK)
+  size.x = (self.hp * size.x) / self.max_hp
+  DrawRectangleV(pos, size, GREEN)
+  Utils.draw_line(tostring(self.hp), Vector2{pos.x, pos.y-20}, 20.0, 1.0, BLACK, WHITE)
+  
+  if (#self.damage_info > 0) then
+    for i = #self.damage_info-1, 0, -1 do
+      local damage_info = &self.damage_info[i]
+      local pos = $damage_info.position + damage_info.pos_offset
+      damage_info.pos_offset.y = damage_info.pos_offset.y - 20*GetFrameTime()
+      Utils.draw_line(tostring(damage_info.damage), pos, 20.0, 1.0, BLACK, damage_info.color)
+      damage_info.timer = damage_info.timer - GetFrameTime()
+      if (damage_info.timer <= 0) then
+        self.damage_info:remove(i)
+      end
+    end
+  end
+
+  if (IsSoundPlaying(self.attacks.voices[self.attacks.current_voice])) then
+    local x = self.animation.position.x
+    local y = self.animation.position.y
+    local x_offset = 10 * math.cos(self.animation.angle)
+    local y_offset = 10 * math.sin(self.animation.angle)
+    local color = Color{Utils.fade(230, 255, 8*GetTime()), 0, 0, 255}
+    DrawRectanglePro(
+      Rectangle{x, y + 3*math.cos(GetTime()), 2, 10},
+      Vector2{1, 5},
+      math.deg(self.animation.angle),
+      color
+    )
+    DrawRectanglePro(
+      Rectangle{
+        x + x_offset,
+        y + y_offset + 3*math.cos(GetTime()),
+        2, 10
+      },
+      Vector2{1, 5},
+      math.deg(self.animation.angle)+45,
+      color
+    )
+    DrawRectanglePro(
+      Rectangle{
+        x - x_offset,
+        y - y_offset + 3*math.cos(GetTime()),
+        2, 10
+      },
+      Vector2{1, 5},
+      math.deg(self.animation.angle)-45,
+      color
+    )
+  end
+
+  if (self.action == RobotAction.Attack_Laser) then
+    self.attacks:draw_laser()
+  end
+
+  if (self.attacks.missile_shot or self.attacks.missile_reached_target) then
+    self.attacks:draw_missile()
+  end
+
+  --[[
+  if (self.pathfinder.has_path and self.pathfinder.current_path ~= nilptr) then
+    for i=0, <self.pathfinder.path_len-1 do
+      local x1 = STEP//2 + (self.pathfinder.current_path[i] % MAP_WIDTH) * STEP
+      local y1 = STEP//2 + (self.pathfinder.current_path[i] // MAP_WIDTH) * STEP
+      local x2 = STEP//2 + (self.pathfinder.current_path[i+1] % MAP_WIDTH) * STEP
+      local y2 = STEP//2 + (self.pathfinder.current_path[i+1] // MAP_WIDTH) * STEP
+      DrawLine(x1, y1, x2, y2, WHITE)
+    end
+  end
+  ]]
+end
+
+function RobotBoss:draw_timer()
+  local current_time = Utils.format_timer(self.timer)
+  local text_size = MeasureText(current_time)
+  local position = Vector2{GetScreenWidth() - 70 - text_size//2, 10}
+  DrawRectangleRec(Rectangle{position.x-4, position.y-2, 3*text_size + 5, 36.0}, Color{10, 10, 150, 255})
+  DrawRectangleRec(Rectangle{position.x-2, position.y, 3*text_size + 1, 32.0}, Color{10, 10, 250, 255})
+  Utils.draw_line(
+    current_time,
+    position,
+    30.0, 1.0, BLACK, WHITE
+  )
+end
+
+function RobotBoss:clear()
+  self.animation:clear()
+  self.attacks:clear()
+end

@@ -1,0 +1,34 @@
+-- At some point I was going to add an ally that will fight the boss with the player
+-- that's why I needed an entity handler to check what entity to attack.
+-- Since that was not implemented I left this here to target the player or
+-- the player's turret, but it doesn't seem to work very well, or at all...
+
+global EntityHandler = @record{
+	entity_list: vector(EntityInfo)
+}
+
+function EntityHandler:get_entity_index(id: EntityId): integer
+	for i, entity in pairs(self.entity_list) do
+		if (entity.id == id) then
+			return i
+		end
+	end
+	return -1
+end
+
+function EntityHandler:add_entity(entity: EntityInfo)
+	self.entity_list:push(entity)
+end
+
+function EntityHandler:get_nearest_entity(position: Vector2): EntityInfo
+	local nearest_pos = math.huge
+	local nearest_index = 0
+	for i, entity_info in pairs(self.entity_list) do
+		local dist = Utils.get_distance(position, entity_info.position)
+		if (dist < nearest_pos) then
+			nearest_pos = dist
+			nearest_index = i
+		end
+	end
+	return self.entity_list[nearest_index]
+end

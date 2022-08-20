@@ -1,0 +1,208 @@
+require "string"
+require "math"
+require "vector"
+
+require "utils"
+require "globals"
+require "map"
+
+require "entities.animation"
+require "entities.player.player"
+require "entities.boss.robotboss"
+require "entities.player.player"
+require "entities.boss.robotboss"
+
+global Game = @record{
+  player: Player,
+  boss: RobotBoss,
+  map: Map,
+  music: [2]Music,
+  current_music: integer,
+  gameover: boolean,
+  player_won: boolean
+}
+
+function Game:init()
+  ## if not RAYLIB_LOG then
+    SetTraceLogLevel(LOG_NONE)
+  ## end
+  -- Window
+  InitWindow(960, 700, "Shooting Robot")
+  ## if not PLATFORM_WEB then
+    SetTargetFPS(60)
+    -- For some reason, when using the c flag `-mwindows`,
+    -- the window's size is not the one set in InitWindow...
+    -- as a workaround, set the actual size after creating it.
+    SetWindowSize(960, 700)
+  ## end
+  InitAudioDevice()
+  self.gameover = false
+  self.player_won = false
+  self.music = {
+    LoadMusicStream("assets/music/dizzy_racing.mp3"),
+    LoadMusicStream("assets/music/squashin_bugs_fixed.mp3")
+  }
+  self.music[0].looping = false
+  self.music[1].looping = false
+  SetMusicVolume(self.music[0], 0.1)
+  SetMusicVolume(self.music[1], 0.1)
+  self.current_music = math.random(0, 1)
+  PlayMusicStream(self.music[self.current_music])
+  --PauseMusicStream(self.music[self.current_music~1])
+end
+
+function Game:init_player()
+  -- Player
+  self.player:init(1.5, 6720, 3920, 12.0) -- Speed, hp, turret_hp, charge_per_hit
+
+  self.player.bullets:init(
+    Rectangle{0, 0, 7, 39}, Rectangle{0, 39, 18, 17}, -- bullet_rect, particle_rect
+    250, 10, 6, 3, 448, -- bullet_range, speed, max_projectile, bullet_available, damage_per_bullet,
+    0.1, {-1.5, 1.5, -1.2, 1, -0.5, 0.5} -- delay, angle_offsets
+  )
+
+  self.player:init_animation("assets/graphics/8bit.png", Vector2{890, 1190}, 25)
+  self.player.animation:set_id(AnimationID.Idle)
+end
+
+function Game:reset()
+  self.player:reset()
+  self.boss:reset()
+  self.gameover = false
+  self.player_won = false
+  PlayMusicStream(self.music[self.current_music])
+end
+
+function Game:update_draw()
+  ## if DEVICE == "desktop" then
+  if (IsMouseButtonPressed(2)) then
+    if (IsCursorHidden()) then
+      ShowCursor()
+    else
+      HideCursor()
+    end
+    self.player.bullets.draw_path = not self.player.bullets.draw_path
+  end
+  ## end
+  UpdateMusicStream(self.music[self.current_music])
+  if (not IsAudioStreamPlaying(self.music[self.current_music].stream)) then
+    StopMusicStream(self.music[self.current_music])
+    self.current_music = self.current_music ~ 1
+    ResumeMusicStream(self.music[self.current_music])
+    PlayMusicStream(self.music[self.current_music])
+  end
+  if (not self.gameover and not self.player_won) then
+    self.player:bullet_update(&self.map, self.boss.animation.position)
+    self.player:update(&self.map)
+  end
+  if (not self.player_won) then
+    self.boss:update(&self.map, &self.player, self.gameover)
+  end
+
+  if (self.player.health.hp <= 0) then
+    self.gameover = true
+    StopMusicStream(self.music[self.current_music])
+  end
+
+  if (self.boss.hp <= 0) then
+    self.player_won = true
+    StopMusicStream(self.music[self.current_music])
+  end
+
+  BeginDrawing()
+  ClearBackground(BLACK)
+  BeginMode2D(self.player.camera)
+
+  self.map:draw_background()
+
+  if (self.player.super.deployed and not self.player.super.is_deploying) then
+    self.player.super:draw_turret_circle()
+  end
+
+  self.map:draw_tiles()
+
+  if (self.player.super.deployed and not self.player.super.is_deploying) then
+    self.player.super:draw_turret()
+  end
+
+  if (not self.gameover) then
+    self.player:animation_draw()
+  end
+
+  if (not self.player_won) then
+    self.boss:draw()
+  end
+
+  if (not self.gameover and not self.player_won) then
+    self.player:bullet_draw()
+  end
+
+  if (self.player.super.is_deploying) then
+    self.player.super:draw_deploying()
+  end
+
+  if (not self.gameover) then
+    self.player:hp_draw()
+    self.player:damage_draw()
+  end
+
+  --[[
+  DrawRectangleRec(Rectangle{0, 0, 30*STEP, 30*STEP}, Color{0, 0, 0, 120})
+  DrawRectangleRec(Rectangle{30*STEP, 0, 30*STEP, 30*STEP}, Color{255, 0, 0, 120})
+  DrawRectangleRec(Rectangle{0, 30*STEP, 30*STEP, 30*STEP}, Color{255, 255, 0, 120})
+  DrawRectangleRec(Rectangle{30*STEP, 30*STEP, 30*STEP, 30*STEP}, Color{255, 255, 255, 120})
+  ]]
+
+  EndMode2D()
+  self.player:super_draw()
+  self.boss:draw_timer()
+  ## if DEVICE == "mobile" then
+  self.player.movement_button:draw()
+  self.player.weapon_button:draw()
+  --[[
+  local p1 = GetTouchPosition(0)
+  local p1_down = IsMouseButtonDown(0)
+  local p2 = GetTouchPosition(1)
+  local p2_down = IsMouseButtonDown(1)
+  local mouse_pos = GetMousePosition()
+  DrawText("0 -> X: " .. tostring(p1.x) .. " Y: " .. tostring(p1.y) .. " IsMouseButtonDown: " .. tostring(p1_down) .. " IsMouseButtonUp: " .. tostring(IsMouseButtonUp(0)), 5, 5, 20, BLACK)
+  DrawText("1 -> X: " .. tostring(p2.x) .. " Y: " .. tostring(p2.y) .. " IsMouseButtonDown: " .. tostring(p2_down) .. " IsMouseButtonUp: " .. tostring(IsMouseButtonUp(1)), 5, 30, 20, BLACK)
+  DrawText("Mouse -> X: " .. tostring(mouse_pos.x) .. " Y: " .. tostring(mouse_pos.y), 5, 60, 20, BLACK)
+  ]]
+  ## end
+  if (self.gameover or self.player_won) then
+    local msg = self.gameover and "Game over!" or "You won!"
+    Utils.draw_line(
+      msg, Vector2{GetScreenWidth()//2 - 100, GetScreenHeight()//2 - 80}, 60, 2, BLACK, WHITE
+    )
+    Utils.draw_line(
+      "Your time: " .. tostring(Utils.format_timer(self.boss.timer)),
+      Vector2{GetScreenWidth()//2 - 150, GetScreenHeight()//2 + 80}, 60, 2, BLACK, WHITE
+    )
+    ## if DEVICE == "desktop" then
+      local reset_msg = "Press left and right click to restart"
+    ## elseif DEVICE == "mobile" then
+      local reset_msg = "Tap with two fingers to restart"
+    ## end
+    Utils.draw_line(
+      reset_msg, Vector2{GetScreenWidth()//2 - 300, GetScreenHeight()//2 + 150},
+      40, 2, BLACK, WHITE
+    )
+    if (IsMouseButtonDown(0) and IsMouseButtonDown(1)) then
+      self:reset()
+    end
+  end
+  --DrawFPS(20, 20)
+  EndDrawing()
+  --collectgarbage()
+end
+
+function Game:clear()
+  UnloadMusicStream(self.music[0])
+  UnloadMusicStream(self.music[1])
+  self.player:clear()
+  self.map:clear()
+  self.boss:clear()
+  CloseAudioDevice()
+  CloseWindow()
+end

@@ -1,0 +1,500 @@
+require "entities.player.bullets"
+require "entities.player.super"
+require "entities.player.health"
+
+require "entities.player.buttons"
+
+global Player = @record{
+	animation: Animation,
+	movement_keys: [4]KeyboardKey,
+	alt_movement_keys: [4]KeyboardKey,
+	movement_angle: float32,
+	can_move: boolean,
+	camera: Camera2D,
+	speed: float32,
+	health: Health,
+	is_buffed: boolean,
+	damage_info: vector(DamageInfo),
+
+	-- Pushback
+	push_timer: float32,
+	push_speed: float32,
+	angle_push: float32,
+	shoot_angle: float32,
+
+	-- Bullets and shooting
+	is_shooting: boolean,
+	bullets: Bullet,
+	super: Super,
+
+	-- Sound
+	shoot_sfx: Sound,
+	no_bullet_sfx: Sound,
+	movement_button: Button,
+	weapon_button: Button,
+	super_button: Button
+}
+
+function Player:init_animation(texture_path: string, pos: Vector2, radius: float32)
+	self.animation:init(texture_path, pos, radius)
+	self.animation:create(AnimationID.Idle, AnimationInfo{Rectangle{0, 0, 72, 40}, {1, 1}})
+	self.animation:create(AnimationID.Walking, AnimationInfo{Rectangle{0, 40, 72, 40}, {0.1, 0.1, 0.1, 0.1, 0.08, 0.08}})
+	self.animation:create(AnimationID.Attacking, AnimationInfo{Rectangle{0, 80, 72, 40}, {0.1, 0.1}})
+	--[[
+	local values: AnimationInfo
+	values.rect = Rectangle{0, 0, 45, 38}
+	values.delay = {0.5, 0.3}
+	self.animation:create(AnimationID.Idle, values)
+
+	-- Walking
+	values.rect = Rectangle{0, 38, 48, 43}
+	values.delay = {0.08, 0.08, 0.08, 0.08}
+	self.animation:create(AnimationID.Walking, values)
+	
+
+	-- Attacking (TODO)
+	self.animation:create(AnimationID.Attacking, values)
+	]]
+end
+
+function Player:init(speed: float32, hp: integer, turret_hp: integer, charge_per_hit: float32)
+	self.health:init(hp)
+	self.super:init(charge_per_hit, turret_hp)
+
+	## if DEVICE == "mobile" then
+	self.movement_button:init(
+		0,
+		GetScreenWidth()//6, GetScreenHeight()-100,
+		BLUE, 
+		ButtonPosition.LEFT,
+		true
+	)
+	self.weapon_button:init(
+		1,
+		GetScreenWidth()-230, GetScreenHeight()-190,
+		RED,
+		ButtonPosition.RIGHT,
+		false
+	)
+	self.super_button:init(
+		1,
+		GetScreenWidth()-80, GetScreenHeight()-80,
+		Color{0, 0, 0, 0},
+		ButtonPosition.RIGHT,
+		false
+	)
+	## end
+
+	self.speed = speed
+	self.is_shooting = false
+	self.movement_keys = {KEY_D, KEY_S, KEY_A, KEY_W}
+	self.alt_movement_keys = {KEY_RIGHT, KEY_DOWN, KEY_LEFT, KEY_UP}
+	self.can_move = true
+	self.camera = Camera2D{Vector2{-GetScreenWidth()//4, -GetScreenHeight()//4}, Vector2.Zero(), 0, 1.5}
+	self.shoot_sfx = LoadSound("assets/sfx/shoot.mp3")
+	self.no_bullet_sfx = LoadSound("assets/sfx/out_of_bullets.mp3")
+	self.movement_angle = 0.0
+	self.shoot_angle = 0.0
+	self.push_speed = 4
+
+	SetSoundVolume(self.shoot_sfx, 0.3)
+	SetSoundVolume(self.no_bullet_sfx, 0.8)
+end
+
+function Player:reset()
+  self.animation.position = Vector2{890, 1190}
+  self.health.hp = 6720
+  self.super.charge = 0.0
+  self.is_shooting = false
+  self.can_move = true
+  self.push_speed = 4
+  self.push_timer = 0.0
+  self.animation.can_rotate = true
+  self.animation:set_id(AnimationID.Idle)
+
+  self.bullets.delay = 0
+  self.bullets.lower_bullet = 0
+  self.bullets.bullet_count = 0
+  self.bullets.delay = 0
+  self.bullets.show_particle = false
+
+  for i=0, <#self.bullets.projectile do
+    self.bullets.projectile[i] = Projectile{0, Vector2{0, 0}, Vector2{0, 0}, false}
+  end
+
+  for i=0, <#self.bullets.ammo_rect do
+    self.bullets.ammo_rect[i].width = 10
+  end
+end
+
+function Player:shooting(current_bullet: *integer, max: integer)
+	self.super.is_aiming = false
+	-- The user can't shoot if the last bullet wasn't reloaded completely
+	if ($current_bullet+1 < max) then
+		PlaySound(self.shoot_sfx)
+		self.is_shooting = true
+		self.animation:set_id(AnimationID.Attacking)
+		self.animation.can_rotate = false
+
+		-- Set the next rectangle's width the current one, and set the current one to 0
+		self.bullets.ammo_rect[$current_bullet+1].width = self.bullets.ammo_rect[$current_bullet].width
+		self.bullets.ammo_rect[$current_bullet].width = 0
+		self.bullets.bullets_available = self.bullets.bullets_available - 1
+    self.bullets.bullets_reloaded = self.bullets.bullets_reloaded - 1
+    $current_bullet = $current_bullet + 1
+	else
+		if (IsSoundPlaying(self.no_bullet_sfx)) then
+			StopSound(self.no_bullet_sfx)
+		end
+		PlaySound(self.no_bullet_sfx)
+	end
+end
+
+function Player:reload_ammo(current_bullet: *integer)
+	local width = self.bullets.ammo_rect[$current_bullet].width
+	if (width >= 0 and self.bullets.bullets_available < self.bullets.bullets_reloaded) then
+		-- The bullet is available as soon as the rectangle's width surpasses 0
+		self.bullets.bullets_available = self.bullets.bullets_available + 1
+		$current_bullet = $current_bullet - 1
+	elseif (width < 10 and self.bullets.bullets_available == self.bullets.bullets_reloaded) then
+		-- The bullet is available but it didn't reload completely yet
+		self.bullets.ammo_rect[$current_bullet].width = self.bullets.ammo_rect[$current_bullet].width + 0.1
+	end
+
+	-- The bullet finished reloading
+	if (self.bullets.ammo_rect[$current_bullet].width >= 10 and self.bullets.bullets_available < self.bullets.max_bullets) then
+		self.bullets.bullets_reloaded = self.bullets.bullets_reloaded + 1
+	end
+end
+
+function Player:update_super(map: Map)
+	if (not self.super.is_aiming) then
+		self.super.is_aiming = true
+		self.super.deployed = false
+	else
+		local super_pos = GetScreenToWorld2D(self.super.position, self.camera)
+		local tile_x = super_pos.x // STEP
+		local tile_y = super_pos.y // STEP
+		local is_wall = map:tile_is_wall(Circle{super_pos, STEP//2})
+		local is_offscreen = tile_x < 0 or tile_x > MAP_WIDTH-1 or tile_y < 0 or tile_y > MAP_HEIGHT-1
+		if (not is_wall and not is_offscreen) then
+			self.super.is_deploying = true
+			self.super.is_aiming = false
+			self.super.charge = 0
+			self.super.turret_position = self.animation.position
+			self.super.position = Vector2{tile_x*STEP + STEP//2, tile_y*STEP + STEP//2}
+		end
+	end
+end
+
+## if DEVICE == "mobile" then
+function Player:update_shoot_button(current_bullet: integer, boss_position: Vector2): integer
+	self.weapon_button:update()
+	self.bullets.draw_line_aim = self.weapon_button.is_pressing and self.weapon_button.distance > 10
+	if (IsMouseButtonReleased(pressed_touches[self.weapon_button.id]) and not self.is_shooting and self.bullets.bullets_available > 0) then
+		if (self.weapon_button.distance <= 10) then
+			self.animation.angle = Utils.get_angle(self.animation.position, boss_position) + math.pi/2
+		else
+			self.animation.angle = self.weapon_button.angle + math.pi/2
+		end
+		self.shoot_angle = self.animation.angle
+		self:shooting(&current_bullet, self.bullets.max_bullets)
+		pressed_touches[self.weapon_button.id] = -1
+	end
+	return current_bullet
+end
+## end
+
+function Player:bullet_update(map: Map, boss_position: Vector2)
+	-- Note: `bullets_available` goes from 3 to 1, but current_bullet goes from 0 to 2
+	local max = self.bullets.max_bullets
+	local available = self.bullets.bullets_available
+	local current_bullet = max - available
+	local current_width = self.bullets.ammo_rect[current_bullet].width
+
+	-- The user pressed and wants to shoot
+	## if DEVICE == "desktop" then
+		if ((IsMouseButtonPressed(0) or IsKeyPressed(KEY_SPACE)) and not self.is_shooting and available > 0) then
+    	self:shooting(&current_bullet, max)
+    	self.shoot_angle = self.animation.angle
+		end
+	## elseif DEVICE == "mobile" then
+		-- Super (mobile)
+		if (self.super.charge >= 360.0 and not self.is_shooting) then
+  		local pos_0 = GetTouchPosition(0)
+  		local pos_1 = GetTouchPosition(1)
+    	local can_act_0 = (IsMouseButtonDown(0) and pos_0.x > GetScreenWidth()//2)
+    	local can_act_1 = (IsMouseButtonDown(1) and pos_1.x > GetScreenHeight()//2)
+			local pos = (can_act_0 and pos_0 or ((can_act_1 and (pos_1) or (Vector2{-1, -1}))))
+			if (pos.x > -1 and pos.y > -1) then
+				local col = CheckCollisionPointCircle(pos, self.super_button.origin_pos, 50)
+				if (not self.super.is_aiming and col) then -- The player wants to aim their super
+					self:update_super(map)
+				elseif (self.super.is_aiming) then -- The player is aiming
+					self.super_button:update()
+				else -- The player wants to shoot
+					current_bullet = self:update_shoot_button(current_bullet, boss_position)
+				end
+			else
+				if (self.super.is_aiming) then
+					self:update_super(map)
+				else
+					current_bullet = self:update_shoot_button(current_bullet, boss_position)
+				end
+			end
+		else
+			current_bullet = self:update_shoot_button(current_bullet, boss_position)
+		end
+	## end
+
+	self.bullets.ammo_rect[current_bullet].width = math.clamp(self.bullets.ammo_rect[current_bullet].width, 0, 10)
+
+	-- Reload ammo
+	if (self.bullets.ammo_rect[current_bullet].width <= 10 and not self.is_shooting) then
+		self:reload_ammo(&current_bullet)
+	end
+
+	-- Super (desktop)
+	## if DEVICE == "desktop" then
+	if (IsMouseButtonPressed(1) and self.super.charge >= 360.0 and not self.is_shooting) then
+		self:update_super(map)
+	end
+	## end
+	
+	-- Bullet creation and movement, this returns false when the last bullet is removed from the map
+	if (self.is_shooting) then
+		self.is_shooting = self.bullets:update(&self.animation, self.shoot_angle, map)
+		self.health.heal_timer = self.health.max_heal_timer
+	end
+end
+
+function Player:movement(map: *Map)
+	local angle = self.movement_angle
+	local moved = false
+	## if DEVICE == "desktop" then
+	if (IsKeyDown(self.movement_keys[2]) or IsKeyDown(self.alt_movement_keys[2])) then -- A
+		angle = -math.pi
+		moved = true
+	elseif (IsKeyDown(self.movement_keys[0]) or IsKeyDown(self.alt_movement_keys[0])) then -- D
+		angle = 0.0
+		moved = true
+	end
+  if (IsKeyDown(self.movement_keys[3]) or IsKeyDown(self.alt_movement_keys[3])) then -- W
+    if (angle ~= self.movement_angle) then
+    	angle = angle < 0 and -3*math.pi/4 or -math.pi/4
+    else
+      angle = -math.pi/2
+    end
+    moved = true
+  elseif (IsKeyDown(self.movement_keys[1]) or IsKeyDown(self.alt_movement_keys[1])) then -- S
+    if (angle ~= self.movement_angle) then
+      angle = angle < 0 and 3*math.pi/4 or math.pi/4
+    else
+      angle = math.pi/2
+    end
+    moved = true
+  end
+	-- Add 90 to the angle because our 0º is the vertical line instead of the horizontal
+	local mouse_pos = GetScreenToWorld2D(GetMousePosition(), self.camera)
+	if (self.animation.can_rotate) then
+		self.animation.angle = Utils.get_angle(self.animation.position, mouse_pos) + math.pi/2
+		self.movement_angle = self.animation.angle
+	end
+	## elseif DEVICE == "mobile" then
+	self.movement_button:update()
+	if (self.movement_button.is_pressing and self.movement_button.distance > 0.1) then
+		angle = self.movement_button.angle
+		if (self.animation.can_rotate) then
+			self.animation.angle = angle + math.pi/2
+		end
+		self.movement_angle = self.movement_button.angle
+		moved = true
+	end
+	## end
+
+	-- Player movement
+	if (moved) then
+		local dx: float32 = (self.speed * math.cos(angle))
+		local dy: float32 = (self.speed * math.sin(angle))
+		Utils.normalize(&dx, &dy, self.speed)
+
+		local new_pos_hor = Vector2{
+			self.animation.position.x + dx,
+			self.animation.position.y
+		}
+		local new_pos_ver = Vector2{
+			self.animation.position.x,
+			self.animation.position.y + dy			
+		}
+		local can_move_hor = true
+		local can_move_ver = true
+
+		local collider_index: vector(integer) = {-1, -1, -1, -1, -1, -1, -1, -1}
+		for i=0, <8 do
+			if (i < 4 and CheckCollisionCircleRec(new_pos_hor, self.animation.hitbox_radius, map.colliders_limits[i])) then
+				if (not Utils.vec_has_value(collider_index, i)) then
+					collider_index[i] = i
+				end
+			elseif (i >= 4 and CheckCollisionCircleRec(new_pos_ver, self.animation.hitbox_radius, map.colliders_limits[i-4])) then
+				if (not Utils.vec_has_value(collider_index, i)) then
+					collider_index[i] = i-4
+				end
+			end
+		end
+
+		for i, index in pairs(collider_index) do
+			if (index == -1) then
+				continue
+			end
+			for _, col in pairs(map.colliders_chunks[index]) do
+				--print(map.grid[x + y*MAP_WIDTH].destroyed)
+				if (col.destroyed) then
+					continue
+				end
+				local col_hor = CheckCollisionCircleRec(
+					new_pos_hor,
+					self.animation.hitbox_radius,
+					Rectangle{col.x, col.y, STEP, STEP}
+				)
+				local col_ver = CheckCollisionCircleRec(
+					new_pos_ver,
+					self.animation.hitbox_radius,
+					Rectangle{col.x, col.y, STEP, STEP}
+				)
+				if (col_hor and can_move_hor) then
+					can_move_hor = false
+				end
+				if (col_ver and can_move_ver) then
+					can_move_ver = false
+				end
+				if (not can_move_hor and not can_move_ver) then
+					break
+				end
+			end
+		end
+		if (can_move_hor or can_move_ver) then
+			if (self.animation.can_rotate) then
+				self.animation:set_id(AnimationID.Walking)
+			end
+			if (can_move_hor and new_pos_hor.x > 10 and new_pos_hor.x < MAP_WIDTH*STEP - 10) then
+				self.animation.position.x = new_pos_hor.x
+			end
+			if (can_move_ver and new_pos_ver.y > 10 and new_pos_ver.y < MAP_HEIGHT*STEP - 10) then
+				self.animation.position.y = new_pos_ver.y
+			end
+		end
+	elseif (self.animation.can_rotate) then
+		self.animation:set_id(AnimationID.Idle)
+	end
+	--## end
+
+	self.camera.target.x = self.animation.position.x - (GetScreenWidth()//2)
+	self.camera.target.y = self.animation.position.y - (GetScreenHeight()//2)
+end
+
+function Player:update_pushback(map: *Map)
+	self.push_timer = self.push_timer - GetFrameTime()
+	local next_step: Vector2
+	next_step.x = self.animation.position.x + self.push_speed * math.cos(self.angle_push)
+	next_step.y = self.animation.position.y + self.push_speed * math.sin(self.angle_push)
+	if (next_step.x <= 2*STEP or next_step.y <= 2*STEP or next_step.x >= (MAP_WIDTH-2)*STEP or next_step.y >= (MAP_HEIGHT-2)*STEP) then
+		self.push_timer = 0.0
+	else
+		self.animation.position = next_step
+	end
+
+	map:destroy_wall(Circle{self.animation.position, self.animation.hitbox_radius})
+
+	if (self.push_timer <= 0) then
+		self.can_move = true
+		self.animation.can_rotate = true
+	end
+end
+
+function Player:update(map: *Map)
+	self.super:update(self.speed)
+	self.animation:update()
+	self:movement(map)
+	if (self.push_timer > 0) then
+  	self:update_pushback(map)
+  end
+
+	-- Buff the player if it is inside the super's circle
+	if (self.super.deployed and not self.super.is_aiming) then
+		local circle_pos = self.super.position + Vector2{STEP//2, STEP//4}
+		local col = CheckCollisionCircles(
+			self.animation.position, self.animation.hitbox_radius,
+			circle_pos, 5*STEP
+		)
+		self.is_buffed = col
+	else
+		self.is_buffed = false
+	end
+
+	self.animation.color = self.is_buffed and PURPLE or WHITE
+
+	if (self.is_buffed) then
+		self.bullets.damage_per_bullet = self.bullets.base_damage + self.bullets.base_damage//2
+	else
+		self.bullets.damage_per_bullet = self.bullets.base_damage
+	end
+
+	-- Update health if the player is not shooting
+	if (#self.damage_info == 0) then
+		self.health:update()
+	else
+		self.health.heal_timer = self.health.max_heal_timer
+	end
+end
+
+function Player:animation_draw()
+	self.animation:draw()
+end
+
+function Player:damage_draw()
+	if (#self.damage_info > 0) then
+		for i = #self.damage_info-1, 0, -1 do
+			local damage_info = &self.damage_info[i]
+			local pos = $damage_info.position + damage_info.pos_offset
+			damage_info.pos_offset.y = damage_info.pos_offset.y - 20*GetFrameTime()
+			Utils.draw_line(tostring(damage_info.damage), pos, 20.0, 1.0, BLACK, damage_info.color)
+			damage_info.timer = damage_info.timer - GetFrameTime()
+			if (damage_info.timer <= 0) then
+				self.damage_info:remove(i)
+			end
+		end
+	end
+end
+
+function Player:bullet_draw()
+	## if DEVICE == "desktop" then
+		local bullet_angle = self.animation.angle
+	## elseif DEVICE == "mobile" then
+		local bullet_angle = self.weapon_button.angle + math.pi/2
+	## end
+	self.bullets:draw(self.animation.position, bullet_angle, IsSoundPlaying(self.no_bullet_sfx), self.camera)
+end
+
+function Player:hp_draw()
+	self.health:draw(self.animation.position)
+end
+
+function Player:super_draw()
+	## if DEVICE == "desktop" then
+		self.super:draw(self.camera, GetMousePosition())
+	## elseif DEVICE == "mobile" then
+		local x = self.animation.position.x + (3 * self.super_button.distance * math.cos(self.super_button.angle))
+		local y = self.animation.position.y + (3 * self.super_button.distance * math.sin(self.super_button.angle))
+		self.super:draw(self.camera, GetWorldToScreen2D(Vector2{x, y}, self.camera))
+	## end
+end
+
+function Player:clear()
+	self.bullets:clear()
+	self.animation:clear()
+	self.health:clear()
+	UnloadTexture(self.super.texture)
+	UnloadSound(self.super.deploy_sound)
+	UnloadSound(self.shoot_sfx)
+	UnloadSound(self.no_bullet_sfx)
+end

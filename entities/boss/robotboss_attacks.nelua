@@ -1,0 +1,445 @@
+global RobotAction = @enum{
+	Idle = 0,
+	Chase,
+	Attack_Melee,
+	Attack_Charge,
+	Attack_Laser
+}
+
+global RobotState = @enum{
+	Normal = 0, -- Lasers attacks only
+	Charge,     -- Can charge
+	Angry,      -- Faster movement, more damage
+	Rocket      -- Can shoot a rocket
+}
+
+global robot_damage: [4]integer = {
+	800,   -- Melee
+	4000,  -- Rocket
+	1500,  -- Charge
+	1200   -- Laser
+}
+
+global Attack = @enum{
+	Melee = 0,  -- Basic punch attack
+	Rocket,
+	Charge,     -- Charge towards the player breaking walls
+	Laser       -- Laser brust
+}
+
+global RobotAttack = @record{
+	attack_timer: float32,            -- When to set a new attack
+	attack_id: Attack,
+
+	current_voice: integer,
+  voices: [4]Sound,
+	damage_sound: Sound,
+	charge_sound: Sound,
+	laser_sound: Sound,
+  missile_explosion: Sound,
+  missile_sound: Sound,
+
+	-- Charge attack
+	charge_attack_timer: float32,     -- Charge only after a certain time
+	charge_started: boolean,          -- Stand still before charging to give the player time to react
+	
+	-- Laser attack
+	laser_texture: Texture2D,
+	laser_delay_bullets: float32,     -- Delay between bullets
+	laser_max_delay_bullets: float32,
+	laser_delay_blast: float32,       -- Delay between idle state and laser blast
+	laser_started_blast: boolean,
+	laser_max_bullets: integer,
+	laser_current_bullet: integer,
+	laser_angle_offset: float32,
+	laser_angle: float32,
+	laser_projectile: vector(Projectile),
+
+	-- Missile attack
+	circle_texture: Texture2D,
+	missile_texture: Texture2D,
+	missile_timer: float32,
+	missile_position: Vector2,
+	missile_angle: float32,
+	missile_speed: float32,
+	missile_shot: boolean,
+  missile_reached_target: boolean,
+	missile_target_position: Vector2,
+  explosion_animation: Animation
+}
+
+function RobotAttack:init()
+	self.laser_texture = LoadTexture("assets/graphics/boss_laser.png")
+	self.laser_max_bullets = 6
+	self.laser_max_delay_bullets = 0.4
+	self.laser_angle_offset = math.pi/12
+
+	self.damage_sound = LoadSound("assets/sfx/punch.mp3")
+	SetSoundVolume(self.damage_sound, 0.5)
+	self.charge_sound = LoadSound("assets/sfx/charge.mp3")
+	SetSoundVolume(self.charge_sound, 0.5)
+	SetSoundPitch(self.charge_sound, 0.5)
+	self.laser_sound = LoadSound("assets/sfx/laser.mp3")
+	SetSoundPitch(self.laser_sound, 1.5)
+  self.missile_explosion = LoadSound("assets/sfx/missile_explosion.mp3")
+  self.missile_sound = LoadSound("assets/sfx/268168__shaun105__laser.mp3")
+  SetSoundVolume(self.missile_sound, 0.3)
+
+  ## for i = 1, 4 do
+    self.voices[#[i-1]#] = LoadSound(#["assets/voice/robot_voice_" .. i .. ".mp3"]#)
+  	SetSoundVolume(self.voices[#[i-1]#], 0.3)
+  ## end
+
+	for i=0, <self.laser_max_bullets do
+		self.laser_projectile:push(Projectile{0, Vector2{0, 0}, Vector2{0, 0}, false})
+	end
+
+	self.circle_texture = LoadTexture("assets/graphics/missile_circle.png")
+	self.missile_texture = LoadTexture("assets/graphics/missile.png")
+	self.missile_speed = 2
+	self.missile_shot = false
+  self.missile_reached_target = false
+	self.missile_timer = 3
+  self.explosion_animation:init("assets/graphics/explosion.png", Vector2{0, 0}, 120.0, true, true)
+  self.explosion_animation:create(0, AnimationInfo{Rectangle{0, 0, 30, 30}, {0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05}})
+  self.explosion_animation:set_id(0)
+
+	self.attack_id = Attack.Melee
+	self.attack_timer = math.random(5, 10)
+end
+
+function RobotAttack:set_laser_values(max_bullets: integer, max_delay: float32)
+ 	local dif = max_bullets - #self.laser_projectile
+ 	for i=0, <dif do
+		self.laser_projectile:push(Projectile{0, Vector2{0, 0}, Vector2{0, 0}, false})
+	end
+  self.laser_max_bullets = max_bullets
+  self.laser_max_delay_bullets = max_delay
+end
+
+function RobotAttack:chase(
+		pathfinder: *Pathfinder, animation: *Animation, action: *RobotAction,
+		speed: float32, map: *Map, nearest_entity: EntityInfo, entity_dist: float32
+	)
+	if (not pathfinder.has_path) then
+		pathfinder:set_path(animation.position, nearest_entity.position, map)
+	end
+
+	if (entity_dist <= 2.8*STEP or pathfinder.path_len < 2) then
+		pathfinder:clear_path()
+		$action = RobotAction.Attack_Melee
+	end
+
+	pathfinder:update(animation, speed)
+end
+
+function RobotAttack:attack_melee(action: *RobotAction, animation: *Animation, nearest_entity: *EntityInfo, entity_dist: float32)
+	local diff = nearest_entity.position - animation.position
+	animation.angle = math.atan2(diff.y, diff.x) + math.pi/2
+
+	-- Damage the entity here
+	if (animation.prev_index ~= animation.index and (animation.index == 1 or animation.index == 3)) then
+		nearest_entity.damage_info:push(DamageInfo{
+			robot_damage[self.attack_id],
+			nearest_entity.position,
+			Vector2{math.random(-20, 20), math.random(-60, 0)},
+			RED,
+			1.0
+		})
+		$nearest_entity.hp = $nearest_entity.hp - robot_damage[self.attack_id]
+		animation.prev_index = animation.index
+		PlaySound(self.damage_sound)
+	end
+
+	--if (entity_dist > 2*STEP) then
+	if (entity_dist > 3*STEP) then
+		$action = RobotAction.Chase
+	end
+end
+
+function RobotAttack:attack_charge(action: *RobotAction, animation: *Animation, map: *Map, player: *Player): AnimationID
+	local anim: AnimationID
+	if (not self.charge_started) then
+		anim = AnimationID.Idle
+		if (self.charge_attack_timer > 0) then
+			self.charge_attack_timer = self.charge_attack_timer - GetFrameTime()
+		else
+			self.charge_started = true
+			self.charge_attack_timer = 2.0
+			PlaySound(self.charge_sound)
+		end
+	else
+		local ang = animation.angle - math.pi/2
+		local next_step: Vector2
+		anim = AnimationID.Walking
+		next_step.x = animation.position.x + 3 * math.cos(ang)
+		next_step.y = animation.position.y + 3 * math.sin(ang)
+		self.charge_attack_timer = self.charge_attack_timer - GetFrameTime()
+		if (next_step.x <= 2*STEP or next_step.y <= 2*STEP or next_step.x >= (MAP_WIDTH-2)*STEP or next_step.y >= (MAP_HEIGHT-2)*STEP) then
+			self.charge_attack_timer = 0.0
+		else
+			animation.position = next_step
+		end
+
+		map:destroy_wall(Circle{animation.position, animation.hitbox_radius})
+
+		local coll_player = CheckCollisionCircles(
+			animation.position, animation.hitbox_radius, 
+			player.animation.position, player.animation.hitbox_radius
+		)
+		if (coll_player and player.push_timer <= 0) then
+			player.can_move = false
+			player.animation.can_rotate = false
+			player.push_timer = 0.2
+      player.push_speed = 4
+			player.angle_push = Utils.get_angle(animation.position, player.animation.position) - math.pi/2
+			player.animation.angle = player.angle_push - math.pi/2
+			player.health.hp = player.health.hp - robot_damage[self.attack_id]
+			player.damage_info:push(DamageInfo{
+				robot_damage[self.attack_id],
+				&player.animation.position,
+				Vector2{math.random(-20, 20), math.random(-60, 0)},
+				RED,
+				1.0
+			})
+			PlaySound(self.damage_sound)
+		end
+		if (self.charge_attack_timer <= 0) then
+			$action = RobotAction.Chase
+			self.attack_id = Attack.Melee
+			StopSound(self.charge_sound)
+		end
+	end
+	return anim
+end
+
+function RobotAttack:attack_laser(action: *RobotAction, animation: *Animation, entity_list: *vector(EntityInfo)): AnimationID
+	local anim: AnimationID
+	if (not self.laser_started_blast) then
+		anim = AnimationID.Idle
+		if (self.laser_delay_blast > 0) then
+			self.laser_delay_blast = self.laser_delay_blast - GetFrameTime()
+		else
+			self.laser_started_blast = true
+		end
+	else
+		self.laser_delay_bullets = self.laser_delay_bullets - GetFrameTime()
+		if (self.laser_delay_bullets <= 0 and self.laser_current_bullet > 0) then
+			local index = self.laser_max_bullets - self.laser_current_bullet
+			self.laser_projectile[index] = Projectile{
+				self.laser_angle, animation.position,
+				animation.position, true
+			}
+			self.laser_angle = self.laser_angle - self.laser_angle_offset
+			self.laser_current_bullet = self.laser_current_bullet - 1
+			self.laser_delay_bullets = self.laser_max_delay_bullets
+			PlaySound(self.laser_sound)
+		end
+	end
+
+	for i=self.laser_max_bullets-1, 0, -1 do
+		local bullet = &self.laser_projectile[i]
+		if (not bullet.on_screen) then
+			continue
+		end
+		bullet.position.x = bullet.position.x + 5 * math.cos(bullet.angle)
+		bullet.position.y = bullet.position.y + 5 * math.sin(bullet.angle)
+
+		local dist = Utils.get_distance(bullet.position, bullet.origin_pos)
+		local bullet_rect = Rectangle{bullet.position.x, bullet.position.y, 10, 10}
+		for _, entity in mpairs(entity_list) do
+			if (CheckCollisionCircleRec(entity.position, entity.hitbox_radius, bullet_rect)) then
+				entity.damage_info:push(DamageInfo{
+					robot_damage[self.attack_id],
+					entity.position,
+					Vector2{math.random(-20, 20), math.random(-60, 0)},
+					RED,
+					1.0
+				})
+				PlaySound(self.damage_sound)
+				$entity.hp = $entity.hp - robot_damage[self.attack_id]
+				bullet.on_screen = false;
+				dist = 300
+				break
+			end
+		end
+
+		if (dist >= 300) then
+			bullet.on_screen = false
+			if (i == self.laser_max_bullets-1 and self.laser_current_bullet <= 0) then
+				$action = RobotAction.Chase
+				self.attack_id = Attack.Melee
+				break
+			end
+		end
+	end
+	return anim
+end
+
+function RobotAttack:attack_missile(animation: *Animation, player: *Player, map: *Map)
+	if (self.missile_timer > 0) then
+		self.missile_timer = self.missile_timer - GetFrameTime()
+	elseif (not self.missile_shot and self.missile_timer <= 0 and not self.missile_reached_target) then
+    self.missile_angle = Utils.get_angle(animation.position, player.animation.position)
+		self.missile_position = animation.position
+		self.missile_target_position = player.animation.position
+		self.missile_shot = true
+    PlaySound(self.missile_sound)
+  elseif (self.missile_shot and self.missile_timer <= 0) then
+    self.missile_position.x = self.missile_position.x + self.missile_speed * math.cos(self.missile_angle)
+    self.missile_position.y = self.missile_position.y + self.missile_speed * math.sin(self.missile_angle)
+    if (Utils.get_distance(self.missile_position, self.missile_target_position) < 1) then
+      self.missile_reached_target = true
+      self.missile_shot = false
+      self.explosion_animation.position.x = self.missile_target_position.x - self.circle_texture.width//2 + 20
+      self.explosion_animation.position.y = self.missile_target_position.y - self.circle_texture.height//2 + 20
+      PlaySound(self.missile_explosion)
+    end
+	else
+    self.explosion_animation:update()
+    map:destroy_wall(Circle{self.missile_target_position, self.explosion_animation.hitbox_radius})
+    local pos_circle = self.explosion_animation.position + Vector2{self.circle_texture.width//2, self.circle_texture.height//2}
+    local coll_player = CheckCollisionCircles(
+      pos_circle, self.explosion_animation.hitbox_radius, 
+      player.animation.position, player.animation.hitbox_radius
+    )
+    if (coll_player and player.push_timer <= 0) then
+      player.can_move = false
+      player.animation.can_rotate = false
+      player.push_timer = 0.3
+      player.push_speed = 8
+      player.angle_push = Utils.get_angle(self.missile_target_position, player.animation.position) + math.pi/2
+      player.animation.angle = player.angle_push - math.pi/2
+      player.health.hp = player.health.hp - robot_damage[Attack.Rocket]
+      player.damage_info:push(DamageInfo{
+        robot_damage[Attack.Rocket],
+        &player.animation.position,
+        Vector2{math.random(-20, 20), math.random(-60, 0)},
+        RED,
+        1.0
+      })
+      PlaySound(self.damage_sound)
+    end
+    if (self.explosion_animation.finished) then
+      self.missile_timer = math.random(7, 9)
+      self.missile_reached_target = false
+      self.explosion_animation.finished = false
+      self.missile_shot = false
+    end
+  end
+end
+
+function RobotAttack:update(
+		action: *RobotAction, state: *RobotState, pathfinder: *Pathfinder,
+		animation: *Animation, map: *Map, player: *Player,
+		speed: float32, entity_list: *vector(EntityInfo),
+		nearest_entity: *EntityInfo, entity_dist: float32
+	): AnimationID
+	local anim: AnimationID
+
+	switch ($action)
+	case RobotAction.Idle then
+		anim = AnimationID.Idle
+	case RobotAction.Chase then
+		anim = AnimationID.Walking
+		self:chase(pathfinder, animation, action, speed, map, $nearest_entity, entity_dist)
+	case RobotAction.Attack_Melee then
+		anim = AnimationID.Attacking
+		self:attack_melee(action, animation, nearest_entity, entity_dist)
+	case RobotAction.Attack_Charge then
+		anim = self:attack_charge(action, animation, map, player)
+	case RobotAction.Attack_Laser then
+		anim = self:attack_laser(action, animation, entity_list)
+	end
+
+	if (self.attack_timer > 0) then
+		self.attack_timer = self.attack_timer - GetFrameTime()
+	else
+		pathfinder:clear_path()
+		if ($state == RobotState.Normal) then
+			self.attack_id = Attack.Laser
+		else
+			self.attack_id = math.random(Attack.Charge, Attack.Laser)
+		end
+		if (self.attack_id == Attack.Charge) then
+			$action = RobotAction.Attack_Charge
+			self.charge_attack_timer = 1.0
+			self.charge_started = false
+			animation.angle = Utils.get_angle(animation.position, player.animation.position) + math.pi/2
+		elseif (self.attack_id == Attack.Laser) then
+			$action = RobotAction.Attack_Laser
+			animation.angle = Utils.get_angle(animation.position, player.animation.position) + math.pi/2
+			self.laser_current_bullet = self.laser_max_bullets
+			self.laser_delay_blast = 0.5
+			self.laser_angle = animation.angle - math.pi/4
+			self.laser_delay_bullets = self.laser_max_delay_bullets
+			self.laser_started_blast = false
+		end
+		self.current_voice = math.random(0, 3)
+		if (self.attack_id ~= Attack.Charge) then
+			PlaySound(self.voices[self.current_voice])
+		end
+		self.attack_timer = math.random(10, 12)
+	end
+
+	if ($state == RobotState.Rocket) then
+		self:attack_missile(animation, player, map)
+	end
+	return anim
+end
+
+function RobotAttack:draw_laser()
+	for i=0, <self.laser_max_bullets do
+		local bullet = self.laser_projectile[i]
+		if (not bullet.on_screen) then
+			continue
+		end
+		DrawTexturePro(
+			self.laser_texture,
+			Rectangle{0, 0, self.laser_texture.width, self.laser_texture.height},
+			Rectangle{bullet.position.x, bullet.position.y, self.laser_texture.width, self.laser_texture.height},
+			Vector2{self.laser_texture.width//2, self.laser_texture.height//2},
+			math.deg(bullet.angle),
+			WHITE
+		)
+		--DrawRectangleRec(Rectangle{bullet.position.x, bullet.position.y, 10, 10}, WHITE)
+	end
+end
+
+function RobotAttack:draw_missile()
+  if (not self.missile_reached_target) then
+    DrawTexturePro(
+      self.circle_texture,
+      Rectangle{0, 0, self.circle_texture.width, self.circle_texture.height},
+      Rectangle{self.missile_target_position.x, self.missile_target_position.y, self.circle_texture.width, self.circle_texture.height},
+      Vector2{self.circle_texture.width//2, self.circle_texture.height//2},
+      0.0,
+      Color{255, 255, 255, 120}
+    )
+    DrawTexturePro(
+      self.missile_texture,
+      Rectangle{0, 0, self.missile_texture.width, self.missile_texture.height},
+      Rectangle{self.missile_position.x, self.missile_position.y, self.missile_texture.width, self.missile_texture.height},
+      Vector2{self.missile_texture.width//2, self.missile_texture.height//2},
+      math.deg(self.missile_angle+math.pi/2),
+      WHITE
+    )
+  else
+    self.explosion_animation:draw(self.circle_texture.width, self.circle_texture.height)
+  end
+end
+
+function RobotAttack:clear()
+	UnloadTexture(self.laser_texture)
+	UnloadTexture(self.circle_texture)
+	UnloadTexture(self.missile_texture)
+	UnloadSound(self.damage_sound)
+	UnloadSound(self.charge_sound)
+	UnloadSound(self.laser_sound)
+  UnloadSound(self.missile_explosion)
+  UnloadSound(self.missile_sound)
+  ## for i = 0, 3 do
+    UnloadSound(self.voices[#[i]#])
+  ## end
+  self.explosion_animation:clear()
+end

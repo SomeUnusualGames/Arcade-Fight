@@ -1,0 +1,98 @@
+global Pathfinder = @record{
+	path_len: cint,
+	current_path: *[0]cint,
+	has_path: boolean,          -- Whether or not a path from the robot to an entity was created
+	reload_path_timer: float32, -- If the entity is too far away recalculate the path after a certain time
+	current_point: integer      -- index of the array of points of the pathfinder
+}
+
+function Pathfinder:init()
+	self.path_len = 0
+	self.has_path = false
+	self.current_path = nilptr
+	self.reload_path_timer = 2
+	self.current_point = 0
+end
+
+function Pathfinder:clear_path()
+	self.has_path = false
+	if (self.current_path ~= nilptr) then
+		self.current_path = nilptr
+	end
+end
+
+function Pathfinder:update(animation: *Animation, speed: float32)
+	if (self.has_path and self.current_path ~= nilptr and self.current_point < self.path_len) then
+		local x = STEP//2 + (self.current_path[self.current_point] % MAP_WIDTH) * STEP
+		local y = STEP//2 + (self.current_path[self.current_point] // MAP_HEIGHT) * STEP
+		local dx = x - animation.position.x
+		local dy = y - animation.position.y
+		Utils.normalize(&dx, &dy, speed)
+		if (self.reload_path_timer > 0) then
+			self.reload_path_timer = self.reload_path_timer - GetFrameTime()
+		end
+
+		animation.angle = math.atan2(dy, dx) + math.pi/2
+		animation.position.x = animation.position.x + speed * dx
+		animation.position.y = animation.position.y + speed * dy
+
+		if (self.reload_path_timer <= 0) then
+			--print("reloadtimer <= 0")
+			self:clear_path()
+			self.reload_path_timer = 2
+		end
+
+		local dist = Utils.get_distance(Vector2{x, y}, animation.position)
+		if (dist <= STEP) then
+			self.current_point = self.current_point + 1
+			if (self.current_point >= self.path_len) then
+				--print(self.current_point, self.path_len)
+				self:clear_path()
+			end
+		end
+	end
+end
+
+function Pathfinder:set_path(my_pos: Vector2, other_pos: Vector2, map: *Map)
+	local other_x = other_pos.x // STEP
+	local other_y = other_pos.y // STEP
+	local current_tile_x = my_pos.x // STEP
+	local current_tile_y = my_pos.y // STEP
+	local neighbors: [9][2]integer = {
+		{0, 0}, {0, -1}, {1, -1}, {1, 0}, {1, 1}, {0, 1}, {-1, -1}, {-1, 0}, {-1, 1}
+	}
+		-- Note: sometimes the bot walks over a wall and that makes the
+		-- pathfinder to fail, so as a workaround we search for all 8 neighbors
+		-- of both the player and the boss
+	for i=0, <#neighbors do
+		local new_x = other_x + neighbors[i][0]
+		local new_y = other_y + neighbors[i][1]
+		local my_x  = current_tile_x + neighbors[i][0]
+		local my_y  = current_tile_y + neighbors[i][1]
+
+		if (new_x < 0 or new_x > MAP_WIDTH or new_y < 0 or new_y > MAP_HEIGHT) then
+			--print("this goal out of bounds", new_x, new_y, MAP_WIDTH, MAP_HEIGHT)
+			continue
+		end
+
+		local other_index = AStar.get_index_by_width(MAP_WIDTH, new_x, new_y)
+		local my_index = AStar.get_index_by_width(MAP_WIDTH, my_x, my_y)
+		if (not map.grid[other_index].wall) then
+			self.current_path = AStar.compute(map.grid_str, &self.path_len, MAP_WIDTH, MAP_HEIGHT, other_index, my_index)
+		else
+			--print("goal is in wall", other_index)
+		end
+		if (self.current_path ~= nilptr) then
+			self.has_path = true
+			self.current_point = 1
+			break
+		else
+			--print("no path found for this goal", other_index, new_x, new_y)
+		end
+	end
+	if (self.current_path == nilptr) then
+		--print(current_tile_x, current_tile_y, other_x, other_y)
+		--panic("path not found!")
+		self.has_path = false
+	end
+end

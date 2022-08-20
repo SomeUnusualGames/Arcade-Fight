@@ -1,0 +1,64 @@
+global Health = @record{
+	max: integer,
+	hp: integer,
+	heal_sound: Sound,
+	heal_timer: float32,        -- Timer to start the healing ticks
+	max_heal_timer: float32,
+	tick_heal_timer: float32,   -- Timer to heal the player between ticks
+	hp_warning: integer,        -- If hp is less than this, make the hp bar fade between green and yellow
+	hp_danger: integer          -- If hp is less than this, make the hp bar fade between green and red
+}
+
+function Health:init(hp: integer)
+	self.max = hp
+	self.hp = hp
+	self.max_heal_timer = 3.0
+	self.tick_heal_timer = 1.0
+	self.heal_sound = LoadSound("assets/sfx/483608__raclure__improvement-healing-chime.mp3")
+	self.heal_timer = self.max_heal_timer
+	self.hp_warning = Utils.percentage(60, self.max)
+	self.hp_danger = Utils.percentage(40, self.max)
+
+	SetSoundPitch(self.heal_sound, 3.6)
+	SetSoundVolume(self.heal_sound, 0.1)
+end
+
+function Health:update()
+	if (self.hp < self.max) then
+		self.heal_timer = self.heal_timer - GetFrameTime()
+		if (self.heal_timer <= 0) then
+			local to_heal = Utils.percentage(HEAL_PERCENTAGE, self.max)
+			PlaySound(self.heal_sound)
+			self.hp = math.clamp(self.hp+to_heal, 0, self.max)
+			self.heal_timer = self.tick_heal_timer
+		end
+	end
+end
+
+function Health:draw(current_pos: Vector2)
+	-- Healthbar
+	local pos = current_pos + Vector2{-20, -54}
+	local hp_width = (self.hp * 36) / self.max
+	local hp_default_color = GREEN
+	local hp_color = hp_default_color
+
+	if (self.hp < self.hp_warning and self.hp > self.hp_danger) then
+		-- Fade between hp_default_color and yellow
+		local r = (@cuchar)(Utils.fade(hp_default_color.r, 255-hp_default_color.r, 5*GetTime()))
+		local g = (@cuchar)(Utils.fade(hp_default_color.g, 255-hp_default_color.g, 5*GetTime()))
+		hp_color = Color{r, g, hp_color.b, hp_color.a}
+	elseif (self.hp < self.hp_warning and self.hp < self.hp_danger) then
+		-- Fade between hp_default_color and red
+		local r = (@cuchar)(Utils.fade(hp_default_color.r, 255-hp_default_color.r, 10*GetTime()))
+		local g = (@cuchar)(Utils.fade(0, hp_default_color.g, GetTime()))
+		local b = (@cuchar)(Utils.fade(0, hp_default_color.b, GetTime()))
+		hp_color = Color{r, g, b, hp_color.a}
+	end
+	DrawRectangleV(Vector2{pos.x-1, pos.y-1}, Vector2{38, 7}, BLACK)
+	DrawRectangleV(pos, Vector2{hp_width, 5}, hp_color)
+	Utils.draw_line(tostring(self.hp), Vector2{pos.x, pos.y-20}, 20.0, 1.0, BLACK, WHITE)
+end
+
+function Health:clear()
+	UnloadSound(self.heal_sound)
+end

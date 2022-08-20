@@ -1,0 +1,81 @@
+global ScreenState = @enum{
+  Screen1 = 0,
+  Screen2,
+  None
+}
+
+global SplashScreen = @record{
+  timer: float32,
+  state: ScreenState,
+  alpha: integer,
+  raylib_logo: Texture2D,
+  sug_logo: Texture2D
+}
+
+function SplashScreen:init()
+  self.timer = 5
+  self.state = ScreenState.Screen1
+  self.alpha = 255
+  self.raylib_logo = LoadTexture("assets/graphics/raylib_128x128.png")
+  self.sug_logo = LoadTexture("assets/graphics/sug.png")
+end
+
+function SplashScreen:clear()
+  UnloadTexture(self.raylib_logo)
+  UnloadTexture(self.sug_logo)
+end
+
+function SplashScreen:update_draw()
+  if (self.state == ScreenState.None) then return end
+
+  ## if DEVICE == "desktop" then
+    local pos = GetMousePosition()
+  ## elseif DEVICE == "mobile" then
+    local pos = GetTouchPosition(0)
+  ## end
+
+  if (IsMouseButtonPressed(0)) then
+    if (self.state == ScreenState.Screen1) then
+      if (CheckCollisionPointRec(pos, Rectangle{50, 440, 480, 70})) then
+        OpenURL("https://zanelittle.com")
+      elseif (CheckCollisionPointRec(pos, Rectangle{50, 250, 400, 50})) then
+        OpenURL("https://www.youtube.com/channel/UCuVuBcjyyZH0pqJsl1hw32Q")
+      end
+    end
+  end
+
+  if (self.timer > 0) then
+    self.timer = self.timer - GetFrameTime()
+    if (self.timer < 0 and self.state == ScreenState.Screen2) then
+      self.state = ScreenState.None
+      self:clear()
+      return
+    end
+  end
+  if (self.state == ScreenState.Screen1 and self.timer < 0) then
+    self.state = ScreenState.Screen2
+  elseif (self.state == ScreenState.Screen2) then
+    if (self.alpha > 0) then
+      self.alpha = self.alpha - 5
+    elseif (self.timer < 0) then
+      self.timer = 5
+    end
+  end
+
+  BeginDrawing()
+  ClearBackground(WHITE)
+  --DrawRectangleRec(Rectangle{230, 250, 400, 50}, BLUE)
+  local black = Color{0, 0, 0, self.alpha}
+  local blue = Color{0, 0, 255, self.alpha}
+  local sug_color = CheckCollisionPointRec(pos, Rectangle{50, 250, 400, 50}) and blue or black
+  local music_color = CheckCollisionPointRec(pos, Rectangle{50, 440, 480, 70}) and blue or black
+  DrawText("Made by: SomeUnusualGames", 50, 250, 40, sug_color)
+  DrawLineEx(Vector2{230, 290}, Vector2{630, 290}, 2.0, blue)
+  DrawTextureEx(self.sug_logo, Vector2{GetScreenWidth()-300, 150}, 0.0, 0.7, Color{255, 255, 255, self.alpha})
+  DrawText("Music: ZaneLittle - https://zanelittle.com", 50, 450, 40, music_color)
+  DrawLineEx(Vector2{430, 490}, Vector2{910, 490}, 2.0, blue) 
+  DrawText("POWERED BY:", 200, 100, 80, Color{0, 0, 0, 255-self.alpha})
+  DrawTexture(self.raylib_logo, 200, 300, Color{255, 255, 255, 255-self.alpha})
+  DrawText("+ Nelua language", 350, 340, 50, Color{13, 110, 253, 255-self.alpha})
+  EndDrawing()
+end

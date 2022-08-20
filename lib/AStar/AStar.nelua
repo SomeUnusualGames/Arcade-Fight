@@ -1,0 +1,12 @@
+## cflags 'lib/AStar/AStar.c lib/AStar/IndexPriorityQueue.c'
+
+global coord_t <cimport, cinclude'"lib/AStar/AStar.h"', nodecl> = @record{
+	x: cint,
+	y: cint
+}
+
+global AStar = @record{}
+function AStar.compute(grid: *cchar <const>, solLength: *cint, boundX: cint, boundY: cint, start: cint, _end: cint): *[0]cint <cimport'astar_compute', cinclude'"lib/AStar/AStar.h"', nodecl> end
+function AStar.unopt_compute(grid: cstring <const>, solLength: *cint, boundX: cint, boundY: cint, start: cint, _end: cint): *cint <cimport'astar_unopt_compute', cinclude'"lib/AStar/AStar.h"', nodecl> end
+function AStar.get_index_by_width(width: cint, x: cint, y: cint): cint <cimport'astar_getIndexByWidth', cinclude'"lib/AStar/AStar.h"', nodecl> end
+function AStar.get_coord_by_width(width: cint, node: cint, x: *cint, y: *cint): void <cimport'astar_getCoordByWidth', cinclude'"lib/AStar/AStar.h"', nodecl> end

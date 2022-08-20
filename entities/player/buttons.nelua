@@ -1,0 +1,104 @@
+global ButtonPosition = @enum{
+  LEFT = 0,
+  RIGHT
+}
+
+global Button = @record{
+  id: integer,
+  origin_pos: Vector2,     -- Position of the button when the user is not pressing it
+  current_pos: Vector2,    -- Position of the button when the user presses it
+  is_pressing: boolean,    -- Whether the user is pressing the screen or not
+  direction: Vector2,      -- Vector that points the center of the button to where the user pressed the screen
+  distance: float32,       -- Magnitude of the previous vector
+  angle: float32,          -- Angle of the previous vector with respect to the x axis
+  color: Color,            -- Color of the button
+  position: ButtonPosition,
+  release_id: boolean
+}
+
+function Button:init(id: integer, pos_x: integer, pos_y: integer, color: Color, position: ButtonPosition, release_id: boolean)
+  local origin: Vector2 = {pos_x, pos_y}
+  self.id = id
+  self.origin_pos = origin
+  self.current_pos = origin
+  self.is_pressing = false
+  self.direction = Vector2{0, 0}
+  self.distance = 0
+  self.color = color
+  self.position = position
+  self.release_id = release_id
+end
+
+function Button:update()
+  local pos_0 = GetTouchPosition(0)
+  local pos_1 = GetTouchPosition(1)
+  if (pressed_touches[self.id] == -1) then
+    local half_screen = GetScreenWidth()//2
+    local can_act_0 = (self.position == ButtonPosition.LEFT and (pos_0.x < half_screen) or (self.position == ButtonPosition.RIGHT and pos_0.x > half_screen))
+    local can_act_1 = (self.position == ButtonPosition.LEFT and (pos_1.x < half_screen) or (self.position == ButtonPosition.RIGHT and pos_1.x > half_screen))
+    if (IsMouseButtonDown(0) and can_act_0 and pressed_touches[self.id~1] ~= 0) then
+      pressed_touches[self.id] = 0
+    elseif (IsMouseButtonDown(1) and can_act_1 and pressed_touches[self.id~1] ~= 1) then
+      pressed_touches[self.id] = 1
+    end
+  end
+  if (pressed_touches[self.id] > -1 and IsMouseButtonUp(pressed_touches[self.id]) and self.release_id) then
+    pressed_touches[self.id] = -1
+  end
+  local pos = GetTouchPosition(pressed_touches[self.id])
+  local pressed = pressed_touches[self.id] > -1
+  local can_act = false
+  
+  switch (self.position)
+  case ButtonPosition.LEFT then
+    can_act = (pos.x < GetScreenWidth()//2)
+  case ButtonPosition.RIGHT then
+    can_act = (pos.x > GetScreenWidth()//2)
+  end
+
+  -- The user pressed the screen on the left side
+  if (pressed and not self.is_pressing and can_act) then
+    self.current_pos = pos
+    self.is_pressing = true
+  end
+
+  -- The user released the screen
+  if (not pressed and self.is_pressing) then
+    self.current_pos = self.origin_pos
+    self.is_pressing = false
+    self.direction = Vector2{0, 0}
+    self.distance = 0
+  end
+
+  -- The user is pressing and holding the screen
+  if (pressed and self.is_pressing) then
+    local dir: Vector2
+    dir.x = pos.x - self.current_pos.x
+    dir.y = pos.y - self.current_pos.y
+    local angle = math.atan2(dir.y, dir.x)
+
+    -- Keep the circle within the ring
+    if (math.abs(dir.x) > math.abs(60*math.cos(angle))) then
+      dir.x = 60*math.cos(angle)
+    end
+    if (math.abs(dir.y) > math.abs(60*math.sin(angle))) then
+      dir.y = 60*math.sin(angle)
+    end
+
+    self.distance = math.sqrt(dir.x^2 + dir.y^2)
+    self.direction = dir
+    self.angle = angle
+  end
+end
+
+
+function Button:draw()
+  -- Circle that represents the center of the button
+  DrawCircleV(self.current_pos, 10.0, Color{5, 5, 5, 50})
+
+  -- Circle that follows the user's direction (movement)
+  DrawCircleV(self.current_pos+self.direction, 20.0, self.color)
+
+  -- Ring that limits the previous circle's movement
+  DrawRing(self.current_pos, 58, 60, 0, 360, 20, self.color)
+end

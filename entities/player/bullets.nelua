@@ -1,0 +1,172 @@
+
+global Bullet = @record{
+	texture: Texture2D,
+	projectile: vector(Projectile),     -- Contains the bullets on screen
+	speed: float32,                     -- Bullets speed
+	max_projectile: integer,            -- Max amount of individual projectiles
+	max_bullets: integer,               -- Max amount of ammo
+	bullet_range: integer,              -- How far the bullet can go
+	bullets_available: integer,
+	bullets_reloaded: integer,
+	ammo_rect: vector(Rectangle),       -- Rectangle on the texture that represents the bullet
+	base_damage: integer,
+	damage_per_bullet: integer,
+	bullet_count: integer,              -- Bullets on screen count
+	lower_bullet: integer,              -- Bullets removed from screen count
+	max_delay: float32,                 -- Delay between projectiles
+	delay: float32,
+	angle_offsets: vector(float32),     -- The projectiles have an angle offset so they don't move in a straight line
+	bullet_rect: Rectangle,
+	particle_rect: Rectangle,           -- Rectangle on the texture of the particle that shows when shooting
+	show_particle: boolean,
+	draw_line_aim: boolean,
+	draw_path: boolean
+}
+
+function Bullet:init(
+		bullet_rect: Rectangle, particle_rect: Rectangle,
+		bullet_range: integer, speed: float32, max_projectile: integer,
+		bullet_available: integer, damage_per_bullet: integer,
+		delay: float32, angle_offsets: vector(float32)
+	)
+	self.texture           = LoadTexture("assets/graphics/8bit_bullet.png")
+	self.bullet_rect       = bullet_rect
+	self.particle_rect     = particle_rect
+	self.bullet_range      = bullet_range
+	self.speed             = speed
+	self.max_projectile    = max_projectile
+	self.bullets_available = bullet_available
+	self.bullets_reloaded  = bullet_available
+	self.max_bullets       = bullet_available
+	self.base_damage       = damage_per_bullet
+	self.damage_per_bullet = damage_per_bullet
+	self.max_delay         = delay
+	self.angle_offsets     = angle_offsets
+
+	self.delay         = 0
+	self.bullet_count  = 0
+	self.lower_bullet  = 0
+	self.show_particle = false
+	self.draw_line_aim = #[DEVICE == "desktop"]#
+	self.draw_path = false
+
+	for i=0, <max_projectile do
+		self.projectile:push(Projectile{0, Vector2{0, 0}, Vector2{0, 0}, false})
+	end
+	for i=0, <bullet_available do
+		self.ammo_rect:push(Rectangle{0, 0, 10, 5})
+	end
+end
+
+function Bullet:update(player: *Animation, angle: float32, map: *Map): boolean
+	if (self.delay > 0) then
+		self.delay = self.delay - GetFrameTime()
+	elseif (self.bullet_count < self.max_projectile) then
+		self.show_particle = true
+
+		local half_w = (player:get_rect().width//2) - 10
+		local half_h = (player:get_rect().height//2) + 10
+		local projectile = &self.projectile[self.bullet_count]
+		-- This is more complicated than it should be...
+		projectile.position.x = player.position.x + half_w * (math.sin(angle) - math.cos(angle))
+		projectile.position.y = player.position.y - half_h * (math.sin(angle) + math.cos(angle))
+		projectile.angle = angle - 85*math.pi/180 + math.rad(self.angle_offsets[self.bullet_count])
+		projectile.origin_pos = projectile.position
+		projectile.on_screen = true
+
+		self.bullet_count = self.bullet_count + 1
+		self.delay = self.max_delay
+	end
+
+	for i = 0, <self.bullet_count do
+		local x = self.projectile[i].position.x
+		local y = self.projectile[i].position.y
+
+		if (not self.projectile[i].on_screen) then
+			continue
+		end
+		self.projectile[i].position.x = x + self.speed * math.cos(self.projectile[i].angle)
+		self.projectile[i].position.y = y + self.speed * math.sin(self.projectile[i].angle)
+		local projectile_rect = Rectangle{self.projectile[i].position.x, self.projectile[i].position.y, 2, 2}
+		local collided_wall = map:tile_is_wall(projectile_rect)
+		local dist = Utils.get_distance(Vector2{x, y}, player.position)
+		if (dist > self.bullet_range or collided_wall) then
+			self.projectile[i].on_screen = false
+			self.lower_bullet = self.lower_bullet + 1
+		end
+	end
+
+	if (self.bullet_count >= self.max_projectile) then
+		player.can_rotate = true
+		self.show_particle = false
+		self.delay = 0
+	end
+	if (self.lower_bullet >= self.max_projectile) then
+		self.lower_bullet = 0
+		self.bullet_count = 0
+		return false
+	end
+	return true
+end
+
+function Bullet:draw(player_pos: Vector2, player_angle: float32, player_blink_ammo: boolean, player_camera: Camera2D)
+
+	if (self.draw_path) then
+		DrawLineV(player_pos, GetScreenToWorld2D(GetMousePosition(), player_camera), Color{255, 255, 255, 105})
+	end
+
+	player_angle = player_angle - math.pi/2
+	--DrawRing(player_pos, self.bullet_range-2, self.bullet_range, (@integer)(-math.deg(player_angle)-3), (@integer)(-math.deg(player_angle)+5), 20, Color{255, 255, 255, 100})
+	if (self.draw_line_aim) then
+		local range = Vector2{player_pos.x+self.bullet_range*math.cos(player_angle), player_pos.y+self.bullet_range*math.sin(player_angle)}
+		DrawLineEx(player_pos, range, 20.0, Color{255, 255, 255, 25})
+	end
+
+	-- Ammo background (gray background represents empty ammo)
+	for i=self.max_bullets, >0, -1 do
+		local pos = player_pos + Vector2{-(11*i)+15*(self.max_bullets/3), -45}
+		DrawRectangleV(Vector2{pos.x-1, pos.y-1}, Vector2{12, 7}, BLACK)
+		DrawRectangleV(pos, Vector2{10, 5}, GRAY)
+	end
+
+	-- Current ammo
+	for i=self.max_bullets-1, 0, -1 do
+		local pos = player_pos + Vector2{-11*(i+1) + 15*(self.max_bullets/3), -45}
+		if (player_blink_ammo) then
+			DrawRectangleV(pos, Vector2{self.ammo_rect[i].width, self.ammo_rect[i].height}, RED)
+		else
+			DrawRectangleV(pos, Vector2{self.ammo_rect[i].width, self.ammo_rect[i].height}, ORANGE)
+		end
+	end
+	
+	-- Bullets on screen
+	for i=0, <self.max_projectile do
+		local pos = self.projectile[i].position
+		if (not self.projectile[i].on_screen or (pos.x == 0 and pos.y == 0)) then
+			continue
+		end
+		if (self.show_particle) then
+			local x = (self.projectile[i].origin_pos.x + GetRandomValue(-1, 1))
+			local y = (self.projectile[i].origin_pos.y + GetRandomValue(-1, 1))
+			local rect_dest = Rectangle{x, y, self.particle_rect.width, self.particle_rect.height}
+			local vect_origin = Vector2{self.particle_rect.width//2, self.particle_rect.height//2}
+			local angle = self.projectile[0].angle + math.pi/2
+			local color = Color{255, 255, 255, 3+(42*(i+1))}
+			DrawTexturePro(self.texture, self.particle_rect, rect_dest, vect_origin, math.deg(angle), color)
+		end
+
+		local rect_source = self.bullet_rect
+		local rect_dest = Rectangle{
+			pos.x, pos.y,
+			self.bullet_rect.width, self.bullet_rect.height
+		}
+		local angle = self.projectile[i].angle + math.pi/2
+		local vect_origin = Vector2{self.bullet_rect.width//2, self.bullet_rect.height//2}
+		DrawTexturePro(self.texture, rect_source, rect_dest, vect_origin, math.deg(angle), WHITE)
+		--DrawRectangleRec(Rectangle{rect_dest.x, rect_dest.y, 2, 2}, BLACK)
+	end
+end
+
+function Bullet:clear()
+	UnloadTexture(self.texture)
+end
