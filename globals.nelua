@@ -10,38 +10,38 @@ global pressed_touches: [2]integer = {-1, -1}
 
 -- Used by robotboss to check what entity is closer
 global EntityId = @enum{
-	Player = 0,
-	Turret
+  Player = 0,
+  Turret
 }
 
 global Circle = @record{
-	center: Vector2,
-	radius: float32
+  center: Vector2,
+  radius: float32
 }
 ## Circle.value.is_circle = true
 
 -- Used when a bullet (from the player or the enemy) hits an entity
 global DamageInfo = @record{
-	damage: integer,
-	position: *Vector2,
-	pos_offset: Vector2,
-	color: Color,
-	timer: float32
+  damage: integer,
+  position: *Vector2,
+  pos_offset: Vector2,
+  color: Color,
+  timer: float32
 }
 
 -- Used by robotboss to hold the entity's info
 global EntityInfo = @record{
-	position: *Vector2,
-	hitbox_radius: float32,
-	id: EntityId,
-	hp: *integer,
-	damage_info: *vector(DamageInfo)
+  position: *Vector2,
+  hitbox_radius: float32,
+  id: EntityId,
+  hp: *integer,
+  damage_info: *vector(DamageInfo)
 }
 
 -- All bullets from any entity must contain this info
 global Projectile = @record{
-	angle: float32,
-	position: Vector2,
-	origin_pos: Vector2,
-	on_screen: boolean
+  angle: float32,
+  position: Vector2,
+  origin_pos: Vector2,
+  on_screen: boolean
 }

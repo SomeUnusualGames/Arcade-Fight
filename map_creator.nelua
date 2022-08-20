@@ -3,17 +3,17 @@ require "iterators"
 require "math"
 
 local Tile = @record{
-	x: integer,
-	y: integer,
-	index: integer
+  x: integer,
+  y: integer,
+  index: integer
 }
 
 local Cursor = @record{
-	x: integer,
-	y: integer,
-	index: integer,
-	selected_tile: Rectangle,
-	placed_tiles: [3600]Tile --[4225]Tile
+  x: integer,
+  y: integer,
+  index: integer,
+  selected_tile: Rectangle,
+  placed_tiles: [3600]Tile --[4225]Tile
 }
 
 InitWindow(800, 600, "Map creator")
@@ -27,129 +27,129 @@ local camera = Camera2D{ Vector2.Zero(), Vector2.Zero(), 0, 1}
 local cursor: Cursor
 cursor.selected_tile = Rectangle{0, 0, STEP, STEP}
 for i = 0, <#cursor.placed_tiles do
-	cursor.placed_tiles[i].index = -1
+  cursor.placed_tiles[i].index = -1
 end
 
 local function update_draw()
-	if (IsKeyPressed(KeyboardKey.KEY_W)) then
-		cursor.y = cursor.y - STEP
-		cursor.index = cursor.index - 65
-	end
-	if (IsKeyPressed(KeyboardKey.KEY_S)) then
-		cursor.y = cursor.y + STEP
-		cursor.index = cursor.index + 65
-	end
-	if (IsKeyPressed(KeyboardKey.KEY_A)) then
-		cursor.x = cursor.x - STEP
-		cursor.index = cursor.index - 1
-	end	
-	if (IsKeyPressed(KeyboardKey.KEY_D)) then
-		cursor.x = cursor.x + STEP
-		cursor.index = cursor.index + 1
-	end
+  if (IsKeyPressed(KeyboardKey.KEY_W)) then
+    cursor.y = cursor.y - STEP
+    cursor.index = cursor.index - 65
+  end
+  if (IsKeyPressed(KeyboardKey.KEY_S)) then
+    cursor.y = cursor.y + STEP
+    cursor.index = cursor.index + 65
+  end
+  if (IsKeyPressed(KeyboardKey.KEY_A)) then
+    cursor.x = cursor.x - STEP
+    cursor.index = cursor.index - 1
+  end 
+  if (IsKeyPressed(KeyboardKey.KEY_D)) then
+    cursor.x = cursor.x + STEP
+    cursor.index = cursor.index + 1
+  end
 
-	--[[
-	if (IsKeyPressed(KeyboardKey.KEY_F)) then
-		for i, tile in pairs(cursor.placed_tiles) do
-			if (tile.index ~= -1) then
-				print(cursor.placed_tiles[i].y, i-1, cursor.placed_tiles[i].y//32)
-				--print(i-1, (i-1)%31, cursor.placed_tiles[i].y)
-				--cursor.placed_tiles[i].x = cursor.placed_tiles[i].x + cursor.placed_tiles[i].x//31
-				--cursor.placed_tiles[i].y = cursor.placed_tiles[i].y + cursor.placed_tiles[i].y//31
-			end
-		end
-	end
-	]]
+  --[[
+  if (IsKeyPressed(KeyboardKey.KEY_F)) then
+    for i, tile in pairs(cursor.placed_tiles) do
+      if (tile.index ~= -1) then
+        print(cursor.placed_tiles[i].y, i-1, cursor.placed_tiles[i].y//32)
+        --print(i-1, (i-1)%31, cursor.placed_tiles[i].y)
+        --cursor.placed_tiles[i].x = cursor.placed_tiles[i].x + cursor.placed_tiles[i].x//31
+        --cursor.placed_tiles[i].y = cursor.placed_tiles[i].y + cursor.placed_tiles[i].y//31
+      end
+    end
+  end
+  ]]
 
-	if (IsKeyPressed(KeyboardKey.KEY_LEFT)) then
-		selected_tile = selected_tile - 1
-	elseif (IsKeyPressed(KeyboardKey.KEY_RIGHT)) then
-		selected_tile = selected_tile + 1
-	end
-	selected_tile = math.clamp(selected_tile, -1, 2)
-	cursor.selected_tile.x = selected_tile * STEP
+  if (IsKeyPressed(KeyboardKey.KEY_LEFT)) then
+    selected_tile = selected_tile - 1
+  elseif (IsKeyPressed(KeyboardKey.KEY_RIGHT)) then
+    selected_tile = selected_tile + 1
+  end
+  selected_tile = math.clamp(selected_tile, -1, 2)
+  cursor.selected_tile.x = selected_tile * STEP
 
-	if (IsKeyPressed(KeyboardKey.KEY_ENTER)) then
-		local size: cuint = #Cursor
-		if (FileExists("map.bin")) then
-			local data_backup = LoadFileData("map.bin", &size)
-			local cursor_backup = (@*Cursor)(data_backup)
-			SaveFileData("map_bak2.bin", cursor_backup, size)
-		end
-		SaveFileData("map2.bin", &cursor, size)
-	end
+  if (IsKeyPressed(KeyboardKey.KEY_ENTER)) then
+    local size: cuint = #Cursor
+    if (FileExists("map.bin")) then
+      local data_backup = LoadFileData("map.bin", &size)
+      local cursor_backup = (@*Cursor)(data_backup)
+      SaveFileData("map_bak2.bin", cursor_backup, size)
+    end
+    SaveFileData("map2.bin", &cursor, size)
+  end
 
-	if (IsKeyPressed(KeyboardKey.KEY_LEFT_SHIFT)) then
-		local size: cuint = #Cursor
-		local read_data = LoadFileData("map.bin", &size)
-		local _cursor = (@*Cursor)(read_data)
-		cursor = $_cursor
-		--[[
-		local x = 0
-		local y = 0
-		for i = 0, 4224 do
-			cursor.placed_tiles[i].x = x
-			cursor.placed_tiles[i].y = y
-			if (i >= 3600) then
-				cursor.placed_tiles[i].index = -1
-			end
-			if (i % 65 == 0) then
-				y = y + STEP
-				x = 0
-			else
-				x = x + STEP
-			end
-		end
-		cursor.x = 0
-		cursor.y = 32
-		cursor.index = 1
-		]]
-	end
+  if (IsKeyPressed(KeyboardKey.KEY_LEFT_SHIFT)) then
+    local size: cuint = #Cursor
+    local read_data = LoadFileData("map.bin", &size)
+    local _cursor = (@*Cursor)(read_data)
+    cursor = $_cursor
+    --[[
+    local x = 0
+    local y = 0
+    for i = 0, 4224 do
+      cursor.placed_tiles[i].x = x
+      cursor.placed_tiles[i].y = y
+      if (i >= 3600) then
+        cursor.placed_tiles[i].index = -1
+      end
+      if (i % 65 == 0) then
+        y = y + STEP
+        x = 0
+      else
+        x = x + STEP
+      end
+    end
+    cursor.x = 0
+    cursor.y = 32
+    cursor.index = 1
+    ]]
+  end
 
-	if (IsKeyPressed(KeyboardKey.KEY_RIGHT_SHIFT)) then
-		local size: cuint = #Cursor
-		local read_data = LoadFileData("map_bak.bin", &size)
-		local _cursor = (@*Cursor)(read_data)
-		cursor = $_cursor
-	end
+  if (IsKeyPressed(KeyboardKey.KEY_RIGHT_SHIFT)) then
+    local size: cuint = #Cursor
+    local read_data = LoadFileData("map_bak.bin", &size)
+    local _cursor = (@*Cursor)(read_data)
+    cursor = $_cursor
+  end
 
-	cursor.index = math.clamp(cursor.index, 0, 3600)
-	if (IsKeyPressed(KeyboardKey.KEY_SPACE)) then
-		cursor.placed_tiles[cursor.index] = Tile{cursor.x, cursor.y, selected_tile}
-	end
+  cursor.index = math.clamp(cursor.index, 0, 3600)
+  if (IsKeyPressed(KeyboardKey.KEY_SPACE)) then
+    cursor.placed_tiles[cursor.index] = Tile{cursor.x, cursor.y, selected_tile}
+  end
 
-	cursor.x = math.clamp(cursor.x, 0, 65*(STEP-1))
-	cursor.y = math.clamp(cursor.y, 0, 65*(STEP-1))
+  cursor.x = math.clamp(cursor.x, 0, 65*(STEP-1))
+  cursor.y = math.clamp(cursor.y, 0, 65*(STEP-1))
 
-	camera.target.x = cursor.x - (GetScreenWidth()//2)
-	camera.target.y = cursor.y - (GetScreenHeight()//2)
+  camera.target.x = cursor.x - (GetScreenWidth()//2)
+  camera.target.y = cursor.y - (GetScreenHeight()//2)
 
-	BeginDrawing()
-	ClearBackground(BLACK)
-	BeginMode2D(camera)
+  BeginDrawing()
+  ClearBackground(BLACK)
+  BeginMode2D(camera)
 
-	DrawTexture(background, 0, 0, WHITE)
-	for i = 0, <#cursor.placed_tiles do
-		local tile = cursor.placed_tiles[i]
-		if (tile.index > -1) then
-			DrawTextureRec(
-				tiles,
-				Rectangle{tile.index*STEP, 0, STEP, STEP},
-				Vector2{tile.x, tile.y},
-				WHITE
-			)
-		end
-	end
-	DrawRectangleLines(cursor.x, cursor.y, STEP, STEP, WHITE)
-	if (selected_tile > -1) then
-		DrawTextureRec(tiles, cursor.selected_tile, Vector2{cursor.x, cursor.y}, WHITE)
-	end
-	EndMode2D()
-	EndDrawing()
+  DrawTexture(background, 0, 0, WHITE)
+  for i = 0, <#cursor.placed_tiles do
+    local tile = cursor.placed_tiles[i]
+    if (tile.index > -1) then
+      DrawTextureRec(
+        tiles,
+        Rectangle{tile.index*STEP, 0, STEP, STEP},
+        Vector2{tile.x, tile.y},
+        WHITE
+      )
+    end
+  end
+  DrawRectangleLines(cursor.x, cursor.y, STEP, STEP, WHITE)
+  if (selected_tile > -1) then
+    DrawTextureRec(tiles, cursor.selected_tile, Vector2{cursor.x, cursor.y}, WHITE)
+  end
+  EndMode2D()
+  EndDrawing()
 end
 
 while (not WindowShouldClose()) do
-	update_draw()
+  update_draw()
 end
 
 UnloadTexture(background)

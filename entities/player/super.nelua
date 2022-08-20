@@ -1,140 +1,140 @@
 local SPAWN_RANGE <comptime> = 6*STEP
 
 global Super = @record{
-	texture: Texture2D,
-	position: Vector2,          -- Position where the turret will spawn
-	turret_position: Vector2,   -- Turret position when deploying
-	turret_max_hp: integer,
-	turret_hp: integer,
-	deploy_sound: Sound,
-	deploy_volume: float32,
-	deployed: boolean,
-	is_deploying: boolean,
-	is_aiming: boolean,
-	charge: float32,            -- Super charge value
-	charge_per_hit: float32,
-	angle: float32,
-	damage_info: vector(DamageInfo)
+  texture: Texture2D,
+  position: Vector2,          -- Position where the turret will spawn
+  turret_position: Vector2,   -- Turret position when deploying
+  turret_max_hp: integer,
+  turret_hp: integer,
+  deploy_sound: Sound,
+  deploy_volume: float32,
+  deployed: boolean,
+  is_deploying: boolean,
+  is_aiming: boolean,
+  charge: float32,            -- Super charge value
+  charge_per_hit: float32,
+  angle: float32,
+  damage_info: vector(DamageInfo)
 }
 
 function Super:init(charge_per_hit: float32, turret_hp: integer)
-	self.charge = 0.0
-	self.turret_position = Vector2{-1, -1}
-	self.texture = LoadTexture("assets/graphics/8bit_super.png")
-	self.charge_per_hit = charge_per_hit
-	self.turret_hp = turret_hp
-	self.turret_max_hp = turret_hp
-	self.deploy_sound = LoadSound("assets/sfx/turret_deploy.mp3")
-	self.deploy_volume = 1.5
-	SetSoundVolume(self.deploy_sound, self.deploy_volume)
+  self.charge = 0.0
+  self.turret_position = Vector2{-1, -1}
+  self.texture = LoadTexture("assets/graphics/8bit_super.png")
+  self.charge_per_hit = charge_per_hit
+  self.turret_hp = turret_hp
+  self.turret_max_hp = turret_hp
+  self.deploy_sound = LoadSound("assets/sfx/turret_deploy.mp3")
+  self.deploy_volume = 1.5
+  SetSoundVolume(self.deploy_sound, self.deploy_volume)
 end
 
 function Super:update(speed: float32)
-	-- Turret movement
-	if (self.is_deploying) then
-		self.turret_position.x = self.turret_position.x + speed * math.cos(self.angle)
-		self.turret_position.y = self.turret_position.y + speed * math.sin(self.angle)
-		local dist = Utils.get_distance(self.turret_position, self.position)
+  -- Turret movement
+  if (self.is_deploying) then
+    self.turret_position.x = self.turret_position.x + speed * math.cos(self.angle)
+    self.turret_position.y = self.turret_position.y + speed * math.sin(self.angle)
+    local dist = Utils.get_distance(self.turret_position, self.position)
 
     -- While testing, there were cases where this if is never true
     -- and the turret is never deployed, but it doesn't seem to happen anymore?
-		if (math.ifloor(dist) <= STEP) then
-			self.is_deploying = false
-			self.deployed = true
-			self.deploy_volume = 0.6
-			SetSoundVolume(self.deploy_sound, self.deploy_volume)
-			PlaySound(self.deploy_sound)
-		end
-	end
-	if (IsSoundPlaying(self.deploy_sound) and self.deploy_volume > 0) then
-		self.deploy_volume = self.deploy_volume - 0.001
-		SetSoundVolume(self.deploy_sound, self.deploy_volume)
-	end
+    if (math.ifloor(dist) <= STEP) then
+      self.is_deploying = false
+      self.deployed = true
+      self.deploy_volume = 0.6
+      SetSoundVolume(self.deploy_sound, self.deploy_volume)
+      PlaySound(self.deploy_sound)
+    end
+  end
+  if (IsSoundPlaying(self.deploy_sound) and self.deploy_volume > 0) then
+    self.deploy_volume = self.deploy_volume - 0.001
+    SetSoundVolume(self.deploy_sound, self.deploy_volume)
+  end
 end
 
 function Super:draw_deploying()
-	-- The turret moves changing its height between [-STEP, STEP],
-	-- simulating a fake 3D rotation
-	local i = math.sin(6*GetTime())
-	DrawTexturePro(
-		self.texture, 
-		Rectangle{0, 0, STEP, math.sign(i)*STEP}, 
-		Rectangle{self.turret_position.x, self.turret_position.y, STEP, STEP * math.abs(i)},
-		Vector2{STEP//2, STEP//2},
-		math.deg(self.angle+math.pi/2),
-		WHITE
-	)
-	--DrawRectangleRec(Rectangle{self.turret_position.x, self.turret_position.y, 2, 2}, BLACK)
-	--DrawRectangleRec(Rectangle{self.position.x, self.position.y, 2, 2}, BLACK)
+  -- The turret moves changing its height between [-STEP, STEP],
+  -- simulating a fake 3D rotation
+  local i = math.sin(6*GetTime())
+  DrawTexturePro(
+    self.texture, 
+    Rectangle{0, 0, STEP, math.sign(i)*STEP}, 
+    Rectangle{self.turret_position.x, self.turret_position.y, STEP, STEP * math.abs(i)},
+    Vector2{STEP//2, STEP//2},
+    math.deg(self.angle+math.pi/2),
+    WHITE
+  )
+  --DrawRectangleRec(Rectangle{self.turret_position.x, self.turret_position.y, 2, 2}, BLACK)
+  --DrawRectangleRec(Rectangle{self.position.x, self.position.y, 2, 2}, BLACK)
 end
 
 function Super:draw_turret_circle()
-	-- Purple circle where the player gets buffed
-	local r = (@cuchar)(Utils.fade(100, 154, GetTime()))
-	DrawTexturePro(
-		self.texture, 
-		Rectangle{0, STEP, self.texture.width, self.texture.height-STEP-1},
-		Rectangle{self.position.x+STEP//2, self.position.y+STEP//4, self.texture.width, 319},
-		Vector2{self.texture.width//2, (self.texture.height-STEP)//2},
-		0,
-		Color{r, 255, 255, 180}
-	)
+  -- Purple circle where the player gets buffed
+  local r = (@cuchar)(Utils.fade(100, 154, GetTime()))
+  DrawTexturePro(
+    self.texture, 
+    Rectangle{0, STEP, self.texture.width, self.texture.height-STEP-1},
+    Rectangle{self.position.x+STEP//2, self.position.y+STEP//4, self.texture.width, 319},
+    Vector2{self.texture.width//2, (self.texture.height-STEP)//2},
+    0,
+    Color{r, 255, 255, 180}
+  )
 end
 
 function Super:draw_turret()
-	-- HP bar and number
-	local pos = Vector2{self.position.x-5, self.position.y-20}
-	local hp_width = (self.turret_hp * 36) / self.turret_max_hp
-	DrawRectangleV(Vector2{pos.x-1, pos.y-1}, Vector2{38, 7}, BLACK)
-	DrawRectangleV(pos, Vector2{hp_width, 5}, GREEN)
-	DrawText(tostring(self.turret_hp), (@integer)(pos.x), (@integer)(pos.y-20), 20, WHITE)
+  -- HP bar and number
+  local pos = Vector2{self.position.x-5, self.position.y-20}
+  local hp_width = (self.turret_hp * 36) / self.turret_max_hp
+  DrawRectangleV(Vector2{pos.x-1, pos.y-1}, Vector2{38, 7}, BLACK)
+  DrawRectangleV(pos, Vector2{hp_width, 5}, GREEN)
+  DrawText(tostring(self.turret_hp), (@integer)(pos.x), (@integer)(pos.y-20), 20, WHITE)
 
-	DrawTexturePro(
-		self.texture,
-		Rectangle{STEP, 0, STEP, STEP},
-		Rectangle{self.position.x, self.position.y-STEP//4, STEP, STEP},
-		Vector2{0, 0},
-		0,
-		WHITE
-	)
+  DrawTexturePro(
+    self.texture,
+    Rectangle{STEP, 0, STEP, STEP},
+    Rectangle{self.position.x, self.position.y-STEP//4, STEP, STEP},
+    Vector2{0, 0},
+    0,
+    WHITE
+  )
 end
 
 function Super:draw(player_camera: Camera2D, position: Vector2)
-	-- Draw the Super button
-	local color_outline: Color
-	local color_button: Color
-	local pos = Vector2{GetScreenWidth()-80, GetScreenHeight()-80}
-	
-	if (self.charge < 360.0) then
-		color_outline = Color{225, 131, 0, 255}
-		color_button = Color{50, 50, 50, 120}
-	else
-		color_button = ORANGE
-		color_outline = GOLD
-	end
+  -- Draw the Super button
+  local color_outline: Color
+  local color_button: Color
+  local pos = Vector2{GetScreenWidth()-80, GetScreenHeight()-80}
+  
+  if (self.charge < 360.0) then
+    color_outline = Color{225, 131, 0, 255}
+    color_button = Color{50, 50, 50, 120}
+  else
+    color_button = ORANGE
+    color_outline = GOLD
+  end
 
-	DrawCircleV(pos, 50, color_button)
-	DrawRing(pos, 46, 50, 0, -self.charge, 20, color_outline)
-	
-	if (self.charge >= 360.0) then
-		DrawText("S", pos.x-5, pos.y-10, 20, Color{230, 230, 230, 230})
-	end
+  DrawCircleV(pos, 50, color_button)
+  DrawRing(pos, 46, 50, 0, -self.charge, 20, color_outline)
+  
+  if (self.charge >= 360.0) then
+    DrawText("S", pos.x-5, pos.y-10, 20, Color{230, 230, 230, 230})
+  end
 
-	if (self.is_aiming) then
-		self.position = position
-		local center = Vector2{GetScreenWidth()//2, GetScreenHeight()//2}
-		self.angle = math.atan2(self.position.y-center.y, self.position.x-center.x)
-		if (not CheckCollisionPointCircle(self.position, center, 5*STEP)) then
-			self.position.x = center.x + SPAWN_RANGE * math.cos(self.angle)
-			self.position.y = center.y + SPAWN_RANGE * math.sin(self.angle)
-		end
-		-- Make the circle fit into the tiles instead of following the mouse
-		local mouse_world = GetScreenToWorld2D(self.position, player_camera)
-		local tile_x = (mouse_world.x//STEP) * STEP + STEP//2
-		local tile_y = (mouse_world.y//STEP) * STEP + STEP//2
-		local tile_pos = GetWorldToScreen2D(Vector2{tile_x, tile_y}, player_camera)
-		DrawLineV(center, tile_pos, Color{255, 203, 203, 130})
-		DrawCircleV(tile_pos, STEP//2, Color{255, 203, 203, 130})
-		--DrawCircleLines((@integer)(mouse_pos.x), (@integer)(mouse_pos.y), STEP, GOLD)
-	end
+  if (self.is_aiming) then
+    self.position = position
+    local center = Vector2{GetScreenWidth()//2, GetScreenHeight()//2}
+    self.angle = math.atan2(self.position.y-center.y, self.position.x-center.x)
+    if (not CheckCollisionPointCircle(self.position, center, 5*STEP)) then
+      self.position.x = center.x + SPAWN_RANGE * math.cos(self.angle)
+      self.position.y = center.y + SPAWN_RANGE * math.sin(self.angle)
+    end
+    -- Make the circle fit into the tiles instead of following the mouse
+    local mouse_world = GetScreenToWorld2D(self.position, player_camera)
+    local tile_x = (mouse_world.x//STEP) * STEP + STEP//2
+    local tile_y = (mouse_world.y//STEP) * STEP + STEP//2
+    local tile_pos = GetWorldToScreen2D(Vector2{tile_x, tile_y}, player_camera)
+    DrawLineV(center, tile_pos, Color{255, 203, 203, 130})
+    DrawCircleV(tile_pos, STEP//2, Color{255, 203, 203, 130})
+    --DrawCircleLines((@integer)(mouse_pos.x), (@integer)(mouse_pos.y), STEP, GOLD)
+  end
 end

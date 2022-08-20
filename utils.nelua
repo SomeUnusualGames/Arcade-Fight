@@ -2,67 +2,67 @@ global Utils = @record{}
 
 -- Checks if value is in vec
 function Utils.vec_has_value(vec: vector(integer), value: integer): boolean
-	for i=0, <#vec do
-		if (vec[i] == value) then
-			return true
-		end
-	end
-	return false
+  for i=0, <#vec do
+    if (vec[i] == value) then
+      return true
+    end
+  end
+  return false
 end
 
 -- Returns euclidean distance
 function Utils.get_distance(pos1: Vector2, pos2: Vector2): float32
-	return math.sqrt((pos1.x-pos2.x)^2 + (pos1.y-pos2.y)^2)
+  return math.sqrt((pos1.x-pos2.x)^2 + (pos1.y-pos2.y)^2)
 end
 
 -- Checks if rec2 is *inside* rec1
 function Utils.rect_is_inside(rec1: Rectangle, rec2: Rectangle): boolean
-	return (
-		rec2.x >= rec1.x and rec2.y >= rec1.y and
-		rec2.x+rec2.width <= rec1.x+rec1.width and
-		rec2.y+rec2.height <= rec1.y+rec1.height
+  return (
+    rec2.x >= rec1.x and rec2.y >= rec1.y and
+    rec2.x+rec2.width <= rec1.x+rec1.width and
+    rec2.y+rec2.height <= rec1.y+rec1.height
   )
 end
 
 -- Normalize the vector so it stays the same magnitude on all directions
 function Utils.normalize(x: *float32, y: *float32, max_magnitude: float32)
-	local magnitude = math.sqrt(($x)^2 + ($y)^2)
-	if (magnitude > max_magnitude) then
-		$x = $x / magnitude
-		$y = $y / magnitude
-	end
+  local magnitude = math.sqrt(($x)^2 + ($y)^2)
+  if (magnitude > max_magnitude) then
+    $x = $x / magnitude
+    $y = $y / magnitude
+  end
 end
 
 -- Calculates `value` per cent of a given maximum (100%)
 function Utils.percentage(value: overload(integer, float32), max: overload(integer, float32))
-	## if value.type.is_integral and max.type.is_integral then
-		return (value * max) // 100
-	## else
-		return (value * max) / 100.0
-	## end
+  ## if value.type.is_integral and max.type.is_integral then
+    return (value * max) // 100
+  ## else
+    return (value * max) / 100.0
+  ## end
 end
 
 -- Return a number between min and max for a given i
 function Utils.fade(min: float32, max: float32, i: number): float32
-	return min + max * math.abs(math.sin(i))
+  return min + max * math.abs(math.sin(i))
 end
 
 -- Calculates the angle between two vectors in radians
 function Utils.get_angle(p1: Vector2, p2: Vector2): float32
-	return math.atan2(p2.y-p1.y, p2.x-p1.x)
+  return math.atan2(p2.y-p1.y, p2.x-p1.x)
 end
 
 -- Turns seconds into a string with the mm:ss format
 function Utils.format_timer(timer: float32): string
-	local m = math.ifloor(timer) // 60
-	local s = math.ifloor(timer) % 60
-	local mm = m < 10 and "0" .. tostring(m) or tostring(m)
-	local ss = s < 10 and "0" .. tostring(s) or tostring(s)
-	return mm .. ":" .. ss
+  local m = math.ifloor(timer) // 60
+  local s = math.ifloor(timer) % 60
+  local mm = m < 10 and "0" .. tostring(m) or tostring(m)
+  local ss = s < 10 and "0" .. tostring(s) or tostring(s)
+  return mm .. ":" .. ss
 end
 
 -- Draw text with an outline
 function Utils.draw_line(text: string, position: Vector2, font_size: float32, spacing: float32, color1: Color, color2: Color)
-	DrawTextEx(GetFontDefault(), text, Vector2{position.x-1, position.y-1}, font_size, spacing, color1)
-	DrawTextEx(GetFontDefault(), text, position, font_size, spacing, color2)
+  DrawTextEx(GetFontDefault(), text, Vector2{position.x-1, position.y-1}, font_size, spacing, color1)
+  DrawTextEx(GetFontDefault(), text, position, font_size, spacing, color2)
 end

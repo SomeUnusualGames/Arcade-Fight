@@ -1,107 +1,107 @@
 
 global AnimationID = @enum{
-	Idle = 0,
-	Walking,
-	Attacking
+  Idle = 0,
+  Walking,
+  Attacking
 }
 
 global AnimationInfo = @record{
-	rect: Rectangle,              -- Rectangle of the current frame
-	delay: vector(float32),       -- Delay between frames
-	origin_pos: Vector2           -- Position of the first frame
+  rect: Rectangle,              -- Rectangle of the current frame
+  delay: vector(float32),       -- Delay between frames
+  origin_pos: Vector2           -- Position of the first frame
 }
 
 global Animation = @record{
-	texture: Texture2D,
-	hitbox_radius: float32,      -- The shadow under the character
-	current_id: AnimationID, 
-	position: Vector2,           -- Position of the character in the world
-	angle: float32,
-	color: Color,
-	index: integer,              -- Index of the current frame, useful to reset animations
-	prev_index: integer,
-	timer: float32,              -- Timer to control the delay between the frames
-	can_rotate: boolean,         -- The player can't change their angle while shooting
-	loop_once: boolean,
-	finished: boolean,
-	no_shadow: boolean,
-	list: [10]AnimationInfo
+  texture: Texture2D,
+  hitbox_radius: float32,      -- The shadow under the character
+  current_id: AnimationID, 
+  position: Vector2,           -- Position of the character in the world
+  angle: float32,
+  color: Color,
+  index: integer,              -- Index of the current frame, useful to reset animations
+  prev_index: integer,
+  timer: float32,              -- Timer to control the delay between the frames
+  can_rotate: boolean,         -- The player can't change their angle while shooting
+  loop_once: boolean,
+  finished: boolean,
+  no_shadow: boolean,
+  list: [10]AnimationInfo
 }
 
 function Animation:init(texture_path: string, position: Vector2, radius: float32, no_shadow: boolean, loop_once: boolean)
-	self.texture = LoadTexture(texture_path)
-	self.angle = 0
-	self.color = WHITE
-	self.position = position
-	self.hitbox_radius = radius
-	self.loop_once = loop_once
-	self.finished = false
-	self.index = 0
-	self.prev_index = 0
-	self.no_shadow = no_shadow
-	self.can_rotate = true
-	self.timer = 1
-	self.current_id = -1
+  self.texture = LoadTexture(texture_path)
+  self.angle = 0
+  self.color = WHITE
+  self.position = position
+  self.hitbox_radius = radius
+  self.loop_once = loop_once
+  self.finished = false
+  self.index = 0
+  self.prev_index = 0
+  self.no_shadow = no_shadow
+  self.can_rotate = true
+  self.timer = 1
+  self.current_id = -1
 end
 
 function Animation:create(id: AnimationID, values: AnimationInfo)
-	-- This is the position of the first frame of the sprite
-	values.origin_pos = Vector2{values.rect.x, values.rect.y}
-	self.list[id] = values
+  -- This is the position of the first frame of the sprite
+  values.origin_pos = Vector2{values.rect.x, values.rect.y}
+  self.list[id] = values
 end
 
-function Animation:set_id(id: AnimationID)	
-	if (id ~= self.current_id) then
-		self.current_id = id
-		-- Reset all the animation variables
-		self.index = 0
-		self.timer = self.list[self.current_id].delay[0]
-		self.list[self.current_id].rect.x = self.list[self.current_id].origin_pos.x
-	end
+function Animation:set_id(id: AnimationID)  
+  if (id ~= self.current_id) then
+    self.current_id = id
+    -- Reset all the animation variables
+    self.index = 0
+    self.timer = self.list[self.current_id].delay[0]
+    self.list[self.current_id].rect.x = self.list[self.current_id].origin_pos.x
+  end
 end
 
 function Animation:get_rect(): Rectangle
-	return self.list[self.current_id].rect
+  return self.list[self.current_id].rect
 end
 
 function Animation:update()
-	if (self.angle >= 2*math.pi) then
-		self.angle = self.angle - 2*math.pi
-	end
+  if (self.angle >= 2*math.pi) then
+    self.angle = self.angle - 2*math.pi
+  end
 
-	if (self.finished) then return end
+  if (self.finished) then return end
 
-	if (self.timer > 0) then
-		self.timer = self.timer - GetFrameTime()
-	else
-		self.list[self.current_id].rect.x = self.list[self.current_id].rect.x + self.list[self.current_id].rect.width
-		self.index = self.index + 1
-		if (self.index >= #self.list[self.current_id].delay) then
-			if (self.loop_once) then
-				self.finished = true
-			end
-			self.index = 0
-			self.list[self.current_id].rect.x = self.list[self.current_id].origin_pos.x
-		end
-		self.timer = self.list[self.current_id].delay[self.index]
-	end
+  if (self.timer > 0) then
+    self.timer = self.timer - GetFrameTime()
+  else
+    self.list[self.current_id].rect.x = self.list[self.current_id].rect.x + self.list[self.current_id].rect.width
+    self.index = self.index + 1
+    if (self.index >= #self.list[self.current_id].delay) then
+      if (self.loop_once) then
+        self.finished = true
+      end
+      self.index = 0
+      self.list[self.current_id].rect.x = self.list[self.current_id].origin_pos.x
+    end
+    self.timer = self.list[self.current_id].delay[self.index]
+  end
 end
 
 function Animation:draw(width: float32, height: float32)
-	local origin_rect = self.list[self.current_id].rect
-	local origin_vect = Vector2{origin_rect.width//2, origin_rect.height//2}
-	local dest_width = width <= 0.0 and origin_rect.width or width
-	local dest_height = height <= 0.0 and origin_rect.height or height
-	local dest_rect = Rectangle{
-		self.position.x, self.position.y,
-		dest_width, dest_height
-	}
-	if (not self.no_shadow) then
-		DrawCircleV(self.position, self.hitbox_radius, Color{0, 0, 0, 60})
-	end
-	DrawTexturePro(self.texture, origin_rect, dest_rect, origin_vect, math.deg(self.angle), self.color)
+  local origin_rect = self.list[self.current_id].rect
+  local origin_vect = Vector2{origin_rect.width//2, origin_rect.height//2}
+  local dest_width = width <= 0.0 and origin_rect.width or width
+  local dest_height = height <= 0.0 and origin_rect.height or height
+  local dest_rect = Rectangle{
+    self.position.x, self.position.y,
+    dest_width, dest_height
+  }
+  if (not self.no_shadow) then
+    DrawCircleV(self.position, self.hitbox_radius, Color{0, 0, 0, 60})
+  end
+  DrawTexturePro(self.texture, origin_rect, dest_rect, origin_vect, math.deg(self.angle), self.color)
 end
 
 function Animation:clear()
-	UnloadTexture(self.texture)
+  UnloadTexture(self.texture)
 end

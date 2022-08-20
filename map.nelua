@@ -2,216 +2,216 @@ require "lib.AStar.AStar"
 
 -- The exact same record as in map_creator
 local _Tile = @record{
-	x: integer,
-	y: integer,
-	index: integer
+  x: integer,
+  y: integer,
+  index: integer
 }
 local _Cursor = @record{
-	_x: integer,
-	_y: integer,
-	_i: integer,
-	_sel_tile: Rectangle,
-	placed_tiles: [MAP_SIZE]_Tile
+  _x: integer,
+  _y: integer,
+  _i: integer,
+  _sel_tile: Rectangle,
+  placed_tiles: [MAP_SIZE]_Tile
 }
 
 local Tile = @record{
-	x: integer,
-	y: integer,
-	index: integer,
-	wall: boolean,
-	destroyed: boolean
+  x: integer,
+  y: integer,
+  index: integer,
+  wall: boolean,
+  destroyed: boolean
 }
 
 global Map = @record{
-	bg_texture: Texture2D,
-	tiles_texture: Texture2D,
-	grid: [MAP_SIZE]Tile,
-	grid_str: string,
-	_tiles: [MAP_SIZE]_Tile,
-	colliders_limits: [4]Rectangle,
-	colliders_chunks: [4]vector(*Tile)
+  bg_texture: Texture2D,
+  tiles_texture: Texture2D,
+  grid: [MAP_SIZE]Tile,
+  grid_str: string,
+  _tiles: [MAP_SIZE]_Tile,
+  colliders_limits: [4]Rectangle,
+  colliders_chunks: [4]vector(*Tile)
 }
 
 local function get_collider_index(obj: overload(Rectangle, Circle), colliders_limits: [4]Rectangle, collider_index: *[4]integer)
-	for i=0, <4 do
-		## if obj.type.is_rectangle then
-			if (CheckCollisionRecs(obj, colliders_limits[i])) then
-				collider_index[i] = i
-			end
-		## else
-			if (CheckCollisionCircleRec(obj.center, obj.radius, colliders_limits[i])) then
-				collider_index[i] = i
-			end
-		## end
-	end
+  for i=0, <4 do
+    ## if obj.type.is_rectangle then
+      if (CheckCollisionRecs(obj, colliders_limits[i])) then
+        collider_index[i] = i
+      end
+    ## else
+      if (CheckCollisionCircleRec(obj.center, obj.radius, colliders_limits[i])) then
+        collider_index[i] = i
+      end
+    ## end
+  end
 end
 
 function Map:init()
-	self.bg_texture = LoadTexture("assets/graphics/map1_base.png")
-	self.tiles_texture = LoadTexture("assets/graphics/obstacles.png")
-	self.grid_str = ""
+  self.bg_texture = LoadTexture("assets/graphics/map1_base.png")
+  self.tiles_texture = LoadTexture("assets/graphics/obstacles.png")
+  self.grid_str = ""
 
-	for i=0, 3 do
-		local x = math.mod(i, 2) * 30 * STEP
-		local y = i <= 1 and 0 or 30*STEP
-		self.colliders_limits[i] = Rectangle{x, y, 30*STEP, 30*STEP}
-	end
+  for i=0, 3 do
+    local x = math.mod(i, 2) * 30 * STEP
+    local y = i <= 1 and 0 or 30*STEP
+    self.colliders_limits[i] = Rectangle{x, y, 30*STEP, 30*STEP}
+  end
 
-	local size: cuint = #_Cursor
-	local read_data = LoadFileData("assets/maps/robot_boss.bin", &size)
-	local _cursor = (@*_Cursor)(read_data)
-	self._tiles = _cursor.placed_tiles
+  local size: cuint = #_Cursor
+  local read_data = LoadFileData("assets/maps/robot_boss.bin", &size)
+  local _cursor = (@*_Cursor)(read_data)
+  self._tiles = _cursor.placed_tiles
 
-	for i = 0, <#self._tiles do
-		local tile = &self._tiles[i]
-		self.grid[i].x = (i % MAP_WIDTH) * STEP
-		self.grid[i].y = (i // MAP_WIDTH) * STEP
-		self.grid[i].index = tile.index
-		self.grid[i].destroyed = false
-		self.grid_str = self.grid_str .. (tile.index > -1 and '0' or '1')
-		if (tile.index > -1) then
-			self.grid[i].wall = true
-			local found = false
-			for j = 0, 3 do
-				local offset = (i < 62 or i % MAP_WIDTH == 0) and 0 or -1
-				if (Utils.rect_is_inside(self.colliders_limits[j], Rectangle{tile.x+offset, tile.y+offset, STEP+offset, STEP+offset})) then
-					self.colliders_chunks[j]:push(&self.grid[i])
-					found = true
-					break
-				end
-			end
-			if (not found) then print("COLLIDER NOT FOUND FOR THIS INDEX", i, (i % MAP_WIDTH), (i // MAP_WIDTH)) end
-		else
-			self.grid[i].wall = false
-		end
-	end
+  for i = 0, <#self._tiles do
+    local tile = &self._tiles[i]
+    self.grid[i].x = (i % MAP_WIDTH) * STEP
+    self.grid[i].y = (i // MAP_WIDTH) * STEP
+    self.grid[i].index = tile.index
+    self.grid[i].destroyed = false
+    self.grid_str = self.grid_str .. (tile.index > -1 and '0' or '1')
+    if (tile.index > -1) then
+      self.grid[i].wall = true
+      local found = false
+      for j = 0, 3 do
+        local offset = (i < 62 or i % MAP_WIDTH == 0) and 0 or -1
+        if (Utils.rect_is_inside(self.colliders_limits[j], Rectangle{tile.x+offset, tile.y+offset, STEP+offset, STEP+offset})) then
+          self.colliders_chunks[j]:push(&self.grid[i])
+          found = true
+          break
+        end
+      end
+      if (not found) then print("COLLIDER NOT FOUND FOR THIS INDEX", i, (i % MAP_WIDTH), (i // MAP_WIDTH)) end
+    else
+      self.grid[i].wall = false
+    end
+  end
 end
 
 function Map:draw_background()
-	DrawTexture(self.bg_texture, 0, 0, WHITE)
-	DrawTexture(self.bg_texture, self.bg_texture.width, 0, WHITE)
-	DrawTexture(self.bg_texture, 0, self.bg_texture.height, WHITE)
-	DrawTexture(self.bg_texture, self.bg_texture.width, self.bg_texture.height, WHITE)
+  DrawTexture(self.bg_texture, 0, 0, WHITE)
+  DrawTexture(self.bg_texture, self.bg_texture.width, 0, WHITE)
+  DrawTexture(self.bg_texture, 0, self.bg_texture.height, WHITE)
+  DrawTexture(self.bg_texture, self.bg_texture.width, self.bg_texture.height, WHITE)
 end
 
 function Map:tile_is_wall(obj: overload(Rectangle, Circle)): boolean
-	local collider_index: [4]integer = {-1, -1, -1, -1}
-	local is_wall = false
-	get_collider_index(obj, self.colliders_limits, &collider_index)
+  local collider_index: [4]integer = {-1, -1, -1, -1}
+  local is_wall = false
+  get_collider_index(obj, self.colliders_limits, &collider_index)
 
-	for i, index in pairs(collider_index) do
-		if (index == -1) then
-			continue
-		end
-		for _, col in pairs(self.colliders_chunks[index]) do
-			if (col.destroyed) then
-				continue
-			end
-			## if obj.type.is_rectangle then
-				if (CheckCollisionRecs(obj, Rectangle{col.x, col.y, STEP, STEP})) then
-					is_wall = true
-					break
-				end
-			## else
-				if (CheckCollisionCircleRec(obj.center, obj.radius, Rectangle{col.x, col.y, STEP, STEP})) then
-					is_wall = true
-					break
-				end
-			## end
-		end
-	end
-	return is_wall
+  for i, index in pairs(collider_index) do
+    if (index == -1) then
+      continue
+    end
+    for _, col in pairs(self.colliders_chunks[index]) do
+      if (col.destroyed) then
+        continue
+      end
+      ## if obj.type.is_rectangle then
+        if (CheckCollisionRecs(obj, Rectangle{col.x, col.y, STEP, STEP})) then
+          is_wall = true
+          break
+        end
+      ## else
+        if (CheckCollisionCircleRec(obj.center, obj.radius, Rectangle{col.x, col.y, STEP, STEP})) then
+          is_wall = true
+          break
+        end
+      ## end
+    end
+  end
+  return is_wall
 end
 
 function Map:destroy_wall(obj: Circle)
-	local collider_index: [4]integer = {-1, -1, -1, -1}
-	local neighbors: [9][2]integer = {{0, 0}, {-1, 0}, {-1, -1}, {0, -1}, {1, -1}, {1, 0}, {1, 1}, {0, 1}, {-1, 1}}
-	get_collider_index(obj, self.colliders_limits, &collider_index)
+  local collider_index: [4]integer = {-1, -1, -1, -1}
+  local neighbors: [9][2]integer = {{0, 0}, {-1, 0}, {-1, -1}, {0, -1}, {1, -1}, {1, 0}, {1, 1}, {0, 1}, {-1, 1}}
+  get_collider_index(obj, self.colliders_limits, &collider_index)
 
-	for i, index in pairs(collider_index) do
-		if (index == -1) then
-			continue
-		end
-		for _, col in pairs(self.colliders_chunks[index]) do
-			if (col.destroyed) then
-				continue
-			end
-			local index = (col.x//STEP) + (col.y//STEP)*MAP_WIDTH
-			for n = 0, <9 do
-				local offset = Vector2{STEP*neighbors[n][0], STEP*neighbors[n][1]}
-				local pos = obj.center + offset
-				if (CheckCollisionCircleRec(pos, obj.radius, Rectangle{col.x, col.y, STEP, STEP})) then
-					self.grid[index].wall = false
-					self.grid[index].destroyed = true
-					self.grid_str = self.grid_str:sub(1, index) .. '1' .. self.grid_str:sub(index+2)
-				end
-			end
-		end
-	end
+  for i, index in pairs(collider_index) do
+    if (index == -1) then
+      continue
+    end
+    for _, col in pairs(self.colliders_chunks[index]) do
+      if (col.destroyed) then
+        continue
+      end
+      local index = (col.x//STEP) + (col.y//STEP)*MAP_WIDTH
+      for n = 0, <9 do
+        local offset = Vector2{STEP*neighbors[n][0], STEP*neighbors[n][1]}
+        local pos = obj.center + offset
+        if (CheckCollisionCircleRec(pos, obj.radius, Rectangle{col.x, col.y, STEP, STEP})) then
+          self.grid[index].wall = false
+          self.grid[index].destroyed = true
+          self.grid_str = self.grid_str:sub(1, index) .. '1' .. self.grid_str:sub(index+2)
+        end
+      end
+    end
+  end
 end
 
 --[[
 function Map:check_destroy_wall(x: integer, y: integer)
-	local neighbors: [9][2]integer = {{0, 0}, {-1, 0}, {-1, -1}, {0, -1}, {1, -1}, {1, 0}, {1, 1}, {0, 1}, {-1, 1}}
-	for _, neighbor in pairs(neighbors) do
-		local _x = x + neighbor[0]
-		local _y = y + neighbor[1]
-		local index = _x + _y*MAP_WIDTH
-		if (self.grid[index].wall) then
-			self.grid[index].wall = false
-			self.grid[index].destroyed = true
-			self.grid_str = self.grid_str:sub(1, index) .. '1' .. self.grid_str:sub(index+2)
-		end
-	end
+  local neighbors: [9][2]integer = {{0, 0}, {-1, 0}, {-1, -1}, {0, -1}, {1, -1}, {1, 0}, {1, 1}, {0, 1}, {-1, 1}}
+  for _, neighbor in pairs(neighbors) do
+    local _x = x + neighbor[0]
+    local _y = y + neighbor[1]
+    local index = _x + _y*MAP_WIDTH
+    if (self.grid[index].wall) then
+      self.grid[index].wall = false
+      self.grid[index].destroyed = true
+      self.grid_str = self.grid_str:sub(1, index) .. '1' .. self.grid_str:sub(index+2)
+    end
+  end
 end
 ]]
 
 function Map:draw_tiles()
-	--local col_index = 0
-	--local col: Tile
-	for i = 0, <#self.grid do
-		local tile = self.grid[i]
-		if (tile.index > -1) then
-			local source = Rectangle{tile.index*STEP, 0, STEP, STEP}
-			local x = tile.x // STEP
-			local y = tile.y // STEP
-			source.y = tile.destroyed and STEP or 0
-			DrawTextureRec(
-				self.tiles_texture,
-				source,
-				Vector2{tile.x, tile.y},
-				WHITE
-			)
-			--[[
-			col = self.colliders[col_index]
-			DrawRectangleRec(
-				Rectangle{col.x, col.y, STEP, STEP},
-				Color{255, 255, 255, 100}
-			)
-			col_index = col_index + 1
-			]]
-		end
-	end
-	--[[
-	local x = 3
-	local y = 3
-	for i = 1, <self.grid_str:len()+1 do
-		local n = self.grid_str:subview(i, i) .. '\0'
-		--if (self.grid_str:subview(i, i) == '0') then
-			DrawText(n, x, y, 20, WHITE)
-		--end
-		if (i%MAP_WIDTH == 0) then
-			x = 3
-			y = y + STEP
-		else
-			x = x + STEP
-		end
-	end
-	]]
+  --local col_index = 0
+  --local col: Tile
+  for i = 0, <#self.grid do
+    local tile = self.grid[i]
+    if (tile.index > -1) then
+      local source = Rectangle{tile.index*STEP, 0, STEP, STEP}
+      local x = tile.x // STEP
+      local y = tile.y // STEP
+      source.y = tile.destroyed and STEP or 0
+      DrawTextureRec(
+        self.tiles_texture,
+        source,
+        Vector2{tile.x, tile.y},
+        WHITE
+      )
+      --[[
+      col = self.colliders[col_index]
+      DrawRectangleRec(
+        Rectangle{col.x, col.y, STEP, STEP},
+        Color{255, 255, 255, 100}
+      )
+      col_index = col_index + 1
+      ]]
+    end
+  end
+  --[[
+  local x = 3
+  local y = 3
+  for i = 1, <self.grid_str:len()+1 do
+    local n = self.grid_str:subview(i, i) .. '\0'
+    --if (self.grid_str:subview(i, i) == '0') then
+      DrawText(n, x, y, 20, WHITE)
+    --end
+    if (i%MAP_WIDTH == 0) then
+      x = 3
+      y = y + STEP
+    else
+      x = x + STEP
+    end
+  end
+  ]]
 end
 
 
 function Map:clear()
-	UnloadTexture(self.bg_texture)
-	UnloadTexture(self.tiles_texture)
+  UnloadTexture(self.bg_texture)
+  UnloadTexture(self.tiles_texture)
 end
