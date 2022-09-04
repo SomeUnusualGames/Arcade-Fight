@@ -26,7 +26,7 @@ Note that the raylib binding ([nelua-raylib](https://github.com/AbdulKalam21/nel
 
 `nelua main.nelua`
 
-By default, the game compiles for the desktop with the keyboard/mouse as the controls.
+By default, the game compiles for the desktop with the keyboard/mouse as the controls and the gc disabled.
 You can add the following optional parameters in no particular order:
 
 - `web`: Replace the main loop with `emscripten_set_main_loop`. You can then compile the game for the web using emscripten. Note that you must [compile raylib for the web](https://github.com/raysan5/raylib/wiki/Working-for-Web-(HTML5)) first.
@@ -34,3 +34,5 @@ You can add the following optional parameters in no particular order:
 - `desktop|mobile`: Whether to use the keyboard/mouse (`desktop`) or the touchscreen (`mobile`). The former is the default option.
 
 - `skip`: Skip the splash screen.
+
+- `gc`: Enable the garbage collector.
