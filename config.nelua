@@ -1,0 +1,39 @@
+-- nelua main.nelua [web] [desktop/mobile] [skip] [log] [gc]
+-- web -> Replace the game loop with `emscripten_set_main_loop`
+-- desktop/mobile -> Whether to use the keyboard and mouse or the touchscreen (the touches are mapped to the mouse)
+-- skip -> Skip the splash screen.
+-- log -> Display raylib logging info (LOG_ALL)
+-- gc -> Enable garbage collector
+require "arg"
+##[[
+local function config()
+  pragmas.nogc = true
+  PLATFORM_WEB = false
+  DEVICE = "desktop"
+  SKIP_SPLASHSCREEN = false
+  RAYLIB_LOG = false
+  -- This lets us pass these parameters in any position
+  for _, a in pairs(arg) do
+    if (a == "web") then
+      PLATFORM_WEB = true
+    elseif (a == "mobile") then
+      DEVICE = "mobile"
+    elseif (a == "skip") then
+      SKIP_SPLASHSCREEN = true
+    elseif (a == "log") then
+      RAYLIB_LOG = true
+    elseif (a == "gc") then
+      pragmas.nogc = false
+    end
+  end
+
+  -- Remove the console if no logging is needed
+  -- NOTE: THIS IS A WINDOWS ONLY PARAMETER
+  -- see https://gcc.gnu.org/onlinedocs/gcc/x86-Windows-Options.html
+  if not RAYLIB_LOG and ccinfo.is_windows then
+    cflags "-mwindows"
+  end
+end
+]]
+
+## config()
