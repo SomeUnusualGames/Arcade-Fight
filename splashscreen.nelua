@@ -17,7 +17,7 @@ function SplashScreen:init()
   self.state = ScreenState.Screen1
   self.alpha = 255
   self.raylib_logo = LoadTexture("assets/graphics/raylib_128x128.png")
-  self.sug_logo = LoadTexture("assets/graphics/sug.png")
+  self.sug_logo = LoadTexture("assets/graphics/sug_logo.png")
 end
 
 function SplashScreen:clear()
