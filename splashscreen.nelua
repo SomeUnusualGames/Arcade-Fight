@@ -9,7 +9,9 @@ global SplashScreen = @record{
   state: ScreenState,
   alpha: integer,
   raylib_logo: Texture2D,
-  sug_logo: Texture2D
+  sug_logo: Texture2D,
+  logo_timer: float32,
+  logo_state: integer
 }
 
 function SplashScreen:init()
@@ -17,7 +19,9 @@ function SplashScreen:init()
   self.state = ScreenState.Screen1
   self.alpha = 255
   self.raylib_logo = LoadTexture("assets/graphics/raylib_128x128.png")
-  self.sug_logo = LoadTexture("assets/graphics/sug_logo.png")
+  self.sug_logo = LoadTexture("assets/graphics/sug_logo2.png")
+  self.logo_timer = 2.5
+  self.logo_state = 0
 end
 
 function SplashScreen:clear()
@@ -40,6 +44,18 @@ function SplashScreen:update_draw()
         OpenURL("https://zanelittle.com")
       elseif (CheckCollisionPointRec(pos, Rectangle{50, 250, 400, 50})) then
         OpenURL("https://www.youtube.com/channel/UCuVuBcjyyZH0pqJsl1hw32Q")
+      end
+    end
+  end
+
+  if (self.logo_timer > 0) then
+    self.logo_timer = self.logo_timer - GetFrameTime()
+    if (self.logo_timer <= 0) then
+      if (self.logo_state == 0) then
+        self.logo_state = 1
+        self.logo_timer = 0.15
+      else
+        self.logo_state = 0
       end
     end
   end
@@ -71,7 +87,15 @@ function SplashScreen:update_draw()
   local music_color = CheckCollisionPointRec(pos, Rectangle{50, 440, 480, 70}) and blue or black
   DrawText("Made by: SomeUnusualGames", 50, 250, 40, sug_color)
   DrawLineEx(Vector2{230, 290}, Vector2{630, 290}, 2.0, blue)
-  DrawTextureEx(self.sug_logo, Vector2{GetScreenWidth()-300, 150}, 0.0, 0.7, Color{255, 255, 255, self.alpha})
+  --DrawTextureEx(self.sug_logo, Vector2{GetScreenWidth()-300, 150}, 0.0, 0.7, Color{255, 255, 255, self.alpha})
+  DrawTexturePro(
+    self.sug_logo,
+    Rectangle{self.logo_state*300, 0, 300, 264},
+    Rectangle{GetScreenWidth()-300, 150, 210, 184.8},
+    Vector2{0, 0},
+    0.0,
+    Color{255, 255, 255, self.alpha}
+  )
   DrawText("Music: ZaneLittle - https://zanelittle.com", 50, 450, 40, music_color)
   DrawLineEx(Vector2{430, 490}, Vector2{910, 490}, 2.0, blue) 
   DrawText("POWERED BY:", 200, 100, 80, Color{0, 0, 0, 255-self.alpha})
