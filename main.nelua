@@ -7,15 +7,15 @@
 require "arg"
 ##[[
 local web = false
-local device = "desktop"
+--local device = "desktop"
 local skip = false
 local log = false
 local nogc = true
 
-local function config(web, device, skip, log, nogc)
+local function config(web, skip, log, nogc)
   pragmas.nogc = nogc
   PLATFORM_WEB = web
-  DEVICE = device
+  --DEVICE = device
   SKIP_SPLASHSCREEN = skip
   RAYLIB_LOG = log
   -- This lets us pass these parameters in any position
@@ -23,7 +23,7 @@ local function config(web, device, skip, log, nogc)
     if (a == "web") then
       PLATFORM_WEB = true
     elseif (a == "mobile") then
-      DEVICE = "mobile"
+      --DEVICE = "mobile"
     elseif (a == "skip") then
       SKIP_SPLASHSCREEN = true
     elseif (a == "log") then
@@ -36,13 +36,13 @@ local function config(web, device, skip, log, nogc)
   -- Remove the console if no logging is needed
   -- NOTE: THIS IS A WINDOWS ONLY PARAMETER
   -- see https://gcc.gnu.org/onlinedocs/gcc/x86-Windows-Options.html
-  if not RAYLIB_LOG and ccinfo.is_windows then
+  if not RAYLIB_LOG and not PLATFORM_WEB and ccinfo.is_windows then
     cflags "-mwindows"
   end
 end
 ]]
 
-## config(web, device, skip, log, nogc)
+## config(web, skip, log, nogc)
 
 require "raylib"
 require "game"
@@ -55,7 +55,7 @@ local function init()
   game:init()
   screen:init()
   ## if SKIP_SPLASHSCREEN then
-    screen.state = ScreenState.None
+    screen.state = ScreenState.DeviceSelection
     screen:clear()
   ## end
   game:init_player()

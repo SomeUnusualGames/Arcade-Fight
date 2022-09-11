@@ -8,6 +8,8 @@ global HEAL_PERCENTAGE <comptime> = 13      -- Healing tick percentage
 
 global pressed_touches: [2]integer = {-1, -1}
 
+global DEVICE = ""
+
 -- Used by robotboss to check what entity is closer
 global EntityId = @enum{
   Player = 0,

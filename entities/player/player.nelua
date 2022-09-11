@@ -61,29 +61,29 @@ function Player:init(speed: float32, hp: integer, turret_hp: integer, charge_per
   self.health:init(hp)
   self.super:init(charge_per_hit, turret_hp)
 
-  ## if DEVICE == "mobile" then
-  self.movement_button:init(
-    0,
-    GetScreenWidth()//6, GetScreenHeight()-100,
-    BLUE, 
-    ButtonPosition.LEFT,
-    true
-  )
-  self.weapon_button:init(
-    1,
-    GetScreenWidth()-230, GetScreenHeight()-190,
-    RED,
-    ButtonPosition.RIGHT,
-    false
-  )
-  self.super_button:init(
-    1,
-    GetScreenWidth()-80, GetScreenHeight()-80,
-    Color{0, 0, 0, 0},
-    ButtonPosition.RIGHT,
-    false
-  )
-  ## end
+  --if DEVICE == "mobile" then
+    self.movement_button:init(
+      0,
+      GetScreenWidth()//6, GetScreenHeight()-100,
+      BLUE, 
+      ButtonPosition.LEFT,
+      true
+    )
+    self.weapon_button:init(
+      1,
+      GetScreenWidth()-230, GetScreenHeight()-190,
+      RED,
+      ButtonPosition.RIGHT,
+      false
+    )
+    self.super_button:init(
+      1,
+      GetScreenWidth()-80, GetScreenHeight()-80,
+      Color{0, 0, 0, 0},
+      ButtonPosition.RIGHT,
+      false
+    )
+  --end
 
   self.speed = speed
   self.is_shooting = false
@@ -187,7 +187,6 @@ function Player:update_super(map: Map)
   end
 end
 
-## if DEVICE == "mobile" then
 function Player:update_shoot_button(current_bullet: integer, boss_position: Vector2): integer
   self.weapon_button:update()
   self.bullets.draw_line_aim = self.weapon_button.is_pressing and self.weapon_button.distance > 10
@@ -203,7 +202,6 @@ function Player:update_shoot_button(current_bullet: integer, boss_position: Vect
   end
   return current_bullet
 end
-## end
 
 function Player:bullet_update(map: Map, boss_position: Vector2)
   -- Note: `bullets_available` goes from 3 to 1, but current_bullet goes from 0 to 2
@@ -213,12 +211,12 @@ function Player:bullet_update(map: Map, boss_position: Vector2)
   local current_width = self.bullets.ammo_rect[current_bullet].width
 
   -- The user pressed and wants to shoot
-  ## if DEVICE == "desktop" then
+  if DEVICE == "desktop" then
     if ((IsMouseButtonPressed(0) or IsKeyPressed(KEY_SPACE)) and not self.is_shooting and available > 0) then
       self:shooting(&current_bullet, max)
       self.shoot_angle = self.animation.angle
     end
-  ## elseif DEVICE == "mobile" then
+  elseif DEVICE == "mobile" then
     -- Super (mobile)
     if (self.super.charge >= 360.0 and not self.is_shooting) then
       local pos_0 = GetTouchPosition(0)
@@ -245,7 +243,7 @@ function Player:bullet_update(map: Map, boss_position: Vector2)
     else
       current_bullet = self:update_shoot_button(current_bullet, boss_position)
     end
-  ## end
+  end
 
   self.bullets.ammo_rect[current_bullet].width = math.clamp(self.bullets.ammo_rect[current_bullet].width, 0, 10)
 
@@ -255,11 +253,11 @@ function Player:bullet_update(map: Map, boss_position: Vector2)
   end
 
   -- Super (desktop)
-  ## if DEVICE == "desktop" then
-  if (IsMouseButtonPressed(1) and self.super.charge >= 360.0 and not self.is_shooting) then
-    self:update_super(map)
+  if DEVICE == "desktop" then
+    if (IsMouseButtonPressed(1) and self.super.charge >= 360.0 and not self.is_shooting) then
+      self:update_super(map)
+    end
   end
-  ## end
   
   -- Bullet creation and movement, this returns false when the last bullet is removed from the map
   if (self.is_shooting) then
@@ -271,46 +269,46 @@ end
 function Player:movement(map: *Map)
   local angle = self.movement_angle
   local moved = false
-  ## if DEVICE == "desktop" then
-  if (IsKeyDown(self.movement_keys[2]) or IsKeyDown(self.alt_movement_keys[2])) then -- A
-    angle = -math.pi
-    moved = true
-  elseif (IsKeyDown(self.movement_keys[0]) or IsKeyDown(self.alt_movement_keys[0])) then -- D
-    angle = 0.0
-    moved = true
-  end
-  if (IsKeyDown(self.movement_keys[3]) or IsKeyDown(self.alt_movement_keys[3])) then -- W
-    if (angle ~= self.movement_angle) then
-      angle = angle < 0 and -3*math.pi/4 or -math.pi/4
-    else
-      angle = -math.pi/2
+  if DEVICE == "desktop" then
+    if (IsKeyDown(self.movement_keys[2]) or IsKeyDown(self.alt_movement_keys[2])) then -- A
+      angle = -math.pi
+      moved = true
+    elseif (IsKeyDown(self.movement_keys[0]) or IsKeyDown(self.alt_movement_keys[0])) then -- D
+      angle = 0.0
+      moved = true
     end
-    moved = true
-  elseif (IsKeyDown(self.movement_keys[1]) or IsKeyDown(self.alt_movement_keys[1])) then -- S
-    if (angle ~= self.movement_angle) then
-      angle = angle < 0 and 3*math.pi/4 or math.pi/4
-    else
-      angle = math.pi/2
+    if (IsKeyDown(self.movement_keys[3]) or IsKeyDown(self.alt_movement_keys[3])) then -- W
+      if (angle ~= self.movement_angle) then
+        angle = angle < 0 and -3*math.pi/4 or -math.pi/4
+      else
+        angle = -math.pi/2
+      end
+      moved = true
+    elseif (IsKeyDown(self.movement_keys[1]) or IsKeyDown(self.alt_movement_keys[1])) then -- S
+      if (angle ~= self.movement_angle) then
+        angle = angle < 0 and 3*math.pi/4 or math.pi/4
+      else
+        angle = math.pi/2
+      end
+      moved = true
     end
-    moved = true
-  end
-  -- Add 90 to the angle because our 0º is the vertical line instead of the horizontal
-  local mouse_pos = GetScreenToWorld2D(GetMousePosition(), self.camera)
-  if (self.animation.can_rotate) then
-    self.animation.angle = Utils.get_angle(self.animation.position, mouse_pos) + math.pi/2
-    self.movement_angle = self.animation.angle
-  end
-  ## elseif DEVICE == "mobile" then
-  self.movement_button:update()
-  if (self.movement_button.is_pressing and self.movement_button.distance > 0.1) then
-    angle = self.movement_button.angle
+    -- Add 90 to the angle because our 0º is the vertical line instead of the horizontal
+    local mouse_pos = GetScreenToWorld2D(GetMousePosition(), self.camera)
     if (self.animation.can_rotate) then
-      self.animation.angle = angle + math.pi/2
+      self.animation.angle = Utils.get_angle(self.animation.position, mouse_pos) + math.pi/2
+      self.movement_angle = self.animation.angle
     end
-    self.movement_angle = self.movement_button.angle
-    moved = true
+  elseif DEVICE == "mobile" then
+    self.movement_button:update()
+    if (self.movement_button.is_pressing and self.movement_button.distance > 0.1) then
+      angle = self.movement_button.angle
+      if (self.animation.can_rotate) then
+        self.animation.angle = angle + math.pi/2
+      end
+      self.movement_angle = self.movement_button.angle
+      moved = true
+    end
   end
-  ## end
 
   -- Player movement
   if (moved) then
@@ -467,11 +465,12 @@ function Player:damage_draw()
 end
 
 function Player:bullet_draw()
-  ## if DEVICE == "desktop" then
-    local bullet_angle = self.animation.angle
-  ## elseif DEVICE == "mobile" then
-    local bullet_angle = self.weapon_button.angle + math.pi/2
-  ## end
+  local bullet_angle: float32
+  if DEVICE == "desktop" then
+    bullet_angle = self.animation.angle
+  elseif DEVICE == "mobile" then
+    bullet_angle = self.weapon_button.angle + math.pi/2
+  end
   self.bullets:draw(self.animation.position, bullet_angle, IsSoundPlaying(self.no_bullet_sfx), self.camera)
 end
 
@@ -480,13 +479,13 @@ function Player:hp_draw()
 end
 
 function Player:super_draw()
-  ## if DEVICE == "desktop" then
+  if DEVICE == "desktop" then
     self.super:draw(self.camera, GetMousePosition())
-  ## elseif DEVICE == "mobile" then
+  elseif DEVICE == "mobile" then
     local x = self.animation.position.x + (3 * self.super_button.distance * math.cos(self.super_button.angle))
     local y = self.animation.position.y + (3 * self.super_button.distance * math.sin(self.super_button.angle))
     self.super:draw(self.camera, GetWorldToScreen2D(Vector2{x, y}, self.camera))
-  ## end
+  end
 end
 
 function Player:clear()

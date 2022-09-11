@@ -47,7 +47,7 @@ function Bullet:init(
   self.bullet_count  = 0
   self.lower_bullet  = 0
   self.show_particle = false
-  self.draw_line_aim = #[DEVICE == "desktop"]#
+  self.draw_line_aim = false
   self.draw_path = false
 
   for i=0, <max_projectile do
@@ -117,7 +117,7 @@ function Bullet:draw(player_pos: Vector2, player_angle: float32, player_blink_am
 
   player_angle = player_angle - math.pi/2
   --DrawRing(player_pos, self.bullet_range-2, self.bullet_range, (@integer)(-math.deg(player_angle)-3), (@integer)(-math.deg(player_angle)+5), 20, Color{255, 255, 255, 100})
-  if (self.draw_line_aim) then
+  if (self.draw_line_aim or DEVICE == "desktop") then
     local range = Vector2{player_pos.x+self.bullet_range*math.cos(player_angle), player_pos.y+self.bullet_range*math.sin(player_angle)}
     DrawLineEx(player_pos, range, 20.0, Color{255, 255, 255, 25})
   end

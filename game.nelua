@@ -22,18 +22,24 @@ global Game = @record{
   player_won: boolean
 }
 
+local function emscripten_run_script_int(script: cstring <const>): cint <cimport, cinclude'"emscripten/emscripten.h"', nodecl> end
+
 function Game:init()
   ## if not RAYLIB_LOG then
     SetTraceLogLevel(LOG_NONE)
   ## end
   -- Window
-  InitWindow(960, 700, "Shooting Robot")
-  ## if not PLATFORM_WEB then
+  ## if PLATFORM_WEB then
+    InitWindow(960, 700, "Arcade Fight")
+  ## else
+    InitWindow(960, 700, "Arcade Fight")
     SetTargetFPS(60)
     -- For some reason, when using the c flag `-mwindows`,
     -- the window's size is not the one set in InitWindow...
     -- as a workaround, set the actual size after creating it.
-    SetWindowSize(960, 700)
+    ## if not RAYLIB_LOG and not PLATFORM_WEB and ccinfo.is_windows then
+      SetWindowSize(960, 700)
+    ## end
   ## end
   InitAudioDevice()
   self.gameover = false
@@ -74,16 +80,16 @@ function Game:reset()
 end
 
 function Game:update_draw()
-  ## if DEVICE == "desktop" then
-  if (IsMouseButtonPressed(2)) then
-    if (IsCursorHidden()) then
-      ShowCursor()
-    else
-      HideCursor()
+  if DEVICE == "desktop" then
+    if (IsMouseButtonPressed(2)) then
+      if (IsCursorHidden()) then
+        ShowCursor()
+      else
+        HideCursor()
+      end
+      self.player.bullets.draw_path = not self.player.bullets.draw_path
     end
-    self.player.bullets.draw_path = not self.player.bullets.draw_path
   end
-  ## end
   UpdateMusicStream(self.music[self.current_music])
   if (not IsAudioStreamPlaying(self.music[self.current_music].stream)) then
     StopMusicStream(self.music[self.current_music])
@@ -156,20 +162,20 @@ function Game:update_draw()
   EndMode2D()
   self.player:super_draw()
   self.boss:draw_timer()
-  ## if DEVICE == "mobile" then
-  self.player.movement_button:draw()
-  self.player.weapon_button:draw()
-  --[[
-  local p1 = GetTouchPosition(0)
-  local p1_down = IsMouseButtonDown(0)
-  local p2 = GetTouchPosition(1)
-  local p2_down = IsMouseButtonDown(1)
-  local mouse_pos = GetMousePosition()
-  DrawText("0 -> X: " .. tostring(p1.x) .. " Y: " .. tostring(p1.y) .. " IsMouseButtonDown: " .. tostring(p1_down) .. " IsMouseButtonUp: " .. tostring(IsMouseButtonUp(0)), 5, 5, 20, BLACK)
-  DrawText("1 -> X: " .. tostring(p2.x) .. " Y: " .. tostring(p2.y) .. " IsMouseButtonDown: " .. tostring(p2_down) .. " IsMouseButtonUp: " .. tostring(IsMouseButtonUp(1)), 5, 30, 20, BLACK)
-  DrawText("Mouse -> X: " .. tostring(mouse_pos.x) .. " Y: " .. tostring(mouse_pos.y), 5, 60, 20, BLACK)
-  ]]
-  ## end
+  if DEVICE == "mobile" then
+    self.player.movement_button:draw()
+    self.player.weapon_button:draw()
+    --[[
+    local p1 = GetTouchPosition(0)
+    local p1_down = IsMouseButtonDown(0)
+    local p2 = GetTouchPosition(1)
+    local p2_down = IsMouseButtonDown(1)
+    local mouse_pos = GetMousePosition()
+    DrawText("0 -> X: " .. tostring(p1.x) .. " Y: " .. tostring(p1.y) .. " IsMouseButtonDown: " .. tostring(p1_down) .. " IsMouseButtonUp: " .. tostring(IsMouseButtonUp(0)), 5, 5, 20, BLACK)
+    DrawText("1 -> X: " .. tostring(p2.x) .. " Y: " .. tostring(p2.y) .. " IsMouseButtonDown: " .. tostring(p2_down) .. " IsMouseButtonUp: " .. tostring(IsMouseButtonUp(1)), 5, 30, 20, BLACK)
+    DrawText("Mouse -> X: " .. tostring(mouse_pos.x) .. " Y: " .. tostring(mouse_pos.y), 5, 60, 20, BLACK)
+    ]]
+  end
   if (self.gameover or self.player_won) then
     local msg = self.gameover and "Game over!" or "You won!"
     Utils.draw_line(
@@ -179,11 +185,12 @@ function Game:update_draw()
       "Your time: " .. tostring(Utils.format_timer(self.boss.timer)),
       Vector2{GetScreenWidth()//2 - 150, GetScreenHeight()//2 + 80}, 60, 2, BLACK, WHITE
     )
-    ## if DEVICE == "desktop" then
-      local reset_msg = "Press left and right click to restart"
-    ## elseif DEVICE == "mobile" then
-      local reset_msg = "Tap with two fingers to restart"
-    ## end
+    local reset_msg = ""
+    if DEVICE == "desktop" then
+      reset_msg = "Press left and right click to restart"
+    elseif DEVICE == "mobile" then
+      reset_msg = "Tap with two fingers to restart"
+    end
     Utils.draw_line(
       reset_msg, Vector2{GetScreenWidth()//2 - 300, GetScreenHeight()//2 + 150},
       40, 2, BLACK, WHITE
