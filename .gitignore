@@ -1,6 +1,4 @@
 etc/
 script
 *.bat
-assets/graphics/8bit*.png
-assets/graphics/boss.png
 assets/voice/*
