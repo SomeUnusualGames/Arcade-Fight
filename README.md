@@ -1,8 +1,6 @@
-# Arcade-Fight
+# Building instructions
 
-## Building instructions
-
-### [Install nelua](https://nelua.io/installing/)
+## [Install nelua](https://nelua.io/installing/)
 
 The following version was used:
 ```
@@ -12,17 +10,17 @@ Git date: 2022-07-21 12:31:19 -0300
 Git hash: 112409b9b54468275a4f4700f04e1b03966994bb
 Semantic version: 0.2.0-dev.1528+112409b9
 ```
-### [Install raylib v4.0.0](https://github.com/raysan5/raylib/releases/tag/4.0.0)
+## [Install raylib v4.0.0](https://github.com/raysan5/raylib/releases/tag/4.0.0)
 
 Look at the [wiki page](https://github.com/raysan5/raylib/wiki#development-platforms) for detailed instructions. 
 
 Using newer versions of raylib is not recommended, it will contain breaking changes.
 
-### Clone this repo.
+## Clone this repo.
 
 Note that the raylib binding ([nelua-raylib](https://github.com/AbdulKalam21/nelua-raylib)) is already included in this repository.
 
-### Build the game
+## Build the game
 
 `nelua main.nelua`
 
