@@ -1,3 +1,11 @@
+# Arcade-Fight
+Source code for the game Arcade Fight made in Nelua.
+Simple top down shooter against a robot boss.
+
+Watch on Youtube (click the image):
+
+[![Watch on Youtube](http://img.youtube.com/vi/YSB4TmimQP4/0.jpg)](http://www.youtube.com/watch?v=YSB4TmimQP4 "The making of the game")
+
 # Building instructions
 
 ## [Install nelua](https://nelua.io/installing/)
@@ -17,6 +25,8 @@ Look at the [wiki page](https://github.com/raysan5/raylib/wiki#development-platf
 Using newer versions of raylib is not recommended, it will contain breaking changes.
 
 ## Clone this repo.
+
+`git clone https://github.com/SomeUnusualGames/Arcade-Fight.git`
 
 Note that the raylib binding ([nelua-raylib](https://github.com/AbdulKalam21/nelua-raylib)) is already included in this repository.
 
