@@ -4,7 +4,7 @@ Simple top down shooter against a robot boss.
 
 Watch on Youtube (click the image):
 
-[![Watch on Youtube](http://img.youtube.com/vi/YSB4TmimQP4/0.jpg)](http://www.youtube.com/watch?v=YSB4TmimQP4 "The making of the game")
+[![Watch on Youtube](http://img.youtube.com/vi/YSB4TmimQP4/maxresdefault.jpg)](http://www.youtube.com/watch?v=YSB4TmimQP4 "The making of the game")
 
 # Building instructions
 
